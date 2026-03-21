@@ -209,7 +209,8 @@ function readPortfolioTargets(): PortfolioTarget[] {
   const normalized: PortfolioTarget[] = [];
   parsed.forEach((item, index) => {
     const candidate = normalizeRawTarget(item);
-    if (!candidate.provider || !PROVIDERS.has(candidate.provider)) {
+    const provider = normalizeProvider(candidate.provider);
+    if (!provider) {
       throw new Error(`Sync target #${index + 1}: provider is missing or unsupported.`);
     }
     if (!candidate.datasetUrl || !candidate.datasetUrl.startsWith("http")) {
@@ -224,7 +225,7 @@ function readPortfolioTargets(): PortfolioTarget[] {
     normalized.push({
       hotelId: normalizeOptional(candidate.hotelId),
       hotelName: normalizeOptional(candidate.hotelName),
-      provider: candidate.provider,
+      provider,
       datasetUrl: candidate.datasetUrl.trim(),
       query: normalizeOptional(candidate.query),
       language: normalizeOptional(candidate.language) || "ru",
@@ -274,4 +275,11 @@ function normalizeLimit(value?: number): number | undefined {
     return undefined;
   }
   return Math.max(10, Math.min(5000, Math.floor(value)));
+}
+
+function normalizeProvider(value?: string): PlatformProvider | null {
+  if (!value) {
+    return null;
+  }
+  return PROVIDERS.has(value as PlatformProvider) ? (value as PlatformProvider) : null;
 }
