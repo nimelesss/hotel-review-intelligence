@@ -28,6 +28,9 @@ interface MemoryState {
   runs: AnalysisRun[];
 }
 
+const LEGACY_DEMO_HOTEL_IDS = new Set(["hotel-riverpark-kazan", "hotel-test-deploy"]);
+const LEGACY_DEMO_HOTEL_NAMES = new Set(["Riverpark Hotel Kazan", "Test Deploy Hotel"]);
+
 export class InMemoryIntelligenceRepository implements IntelligenceRepository {
   private state: MemoryState;
   private readonly storePath: string;
@@ -48,6 +51,7 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
 
     const loaded = this.loadFromDisk();
     this.state = loaded ?? seededState;
+    this.removeLegacyDemoHotels();
     this.bootstrapAnalytics();
     this.flushToDisk();
   }
@@ -257,6 +261,42 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
     if (loaded) {
       this.state = loaded;
     }
+  }
+
+  private removeLegacyDemoHotels(): void {
+    const removableHotelIds = new Set(
+      this.state.hotels
+        .filter(
+          (hotel) =>
+            LEGACY_DEMO_HOTEL_IDS.has(hotel.id) || LEGACY_DEMO_HOTEL_NAMES.has(hotel.name)
+        )
+        .map((hotel) => hotel.id)
+    );
+
+    if (!removableHotelIds.size) {
+      return;
+    }
+
+    const removableReviewIds = new Set(
+      this.state.reviews
+        .filter((review) => removableHotelIds.has(review.hotelId))
+        .map((review) => review.id)
+    );
+
+    this.state.hotels = this.state.hotels.filter((hotel) => !removableHotelIds.has(hotel.id));
+    this.state.reviews = this.state.reviews.filter(
+      (review) => !removableHotelIds.has(review.hotelId)
+    );
+    this.state.analyses = this.state.analyses.filter(
+      (analysis) => !removableReviewIds.has(analysis.reviewId)
+    );
+    this.state.aggregates = this.state.aggregates.filter(
+      (aggregate) => !removableHotelIds.has(aggregate.hotelId)
+    );
+    this.state.recommendations = this.state.recommendations.filter(
+      (item) => !removableHotelIds.has(item.hotelId)
+    );
+    this.state.runs = this.state.runs.filter((run) => !removableHotelIds.has(run.hotelId));
   }
 
   private loadFromDisk(): MemoryState | null {
