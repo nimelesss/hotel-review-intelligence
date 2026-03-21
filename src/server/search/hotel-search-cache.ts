@@ -1,4 +1,4 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import { HotelSearchResult } from "@/entities/types";
 import { seedHotelSearchCatalog } from "@/data/seeds/hotel-search-catalog";
@@ -12,6 +12,7 @@ interface CacheFilePayload {
 
 const DEFAULT_CACHE_LIMIT = 50_000;
 const DEFAULT_MEMORY_TTL_MS = 60_000;
+const DEFAULT_INCLUDE_SEED_CATALOG = false;
 
 let memoryCache: HotelSearchResult[] | null = null;
 let memoryLoadedAt = 0;
@@ -39,6 +40,15 @@ function getMemoryTtlMs(): number {
     return DEFAULT_MEMORY_TTL_MS;
   }
   return Math.floor(parsed);
+}
+
+function shouldIncludeSeedCatalog(): boolean {
+  const raw = (process.env.HOTEL_SEARCH_INCLUDE_SEED || "").trim();
+  if (!raw) {
+    return DEFAULT_INCLUDE_SEED_CATALOG;
+  }
+  const normalized = raw.toLocaleLowerCase("ru-RU");
+  return ["1", "true", "yes", "on"].includes(normalized);
 }
 
 function signature(item: HotelSearchResult): string {
@@ -156,7 +166,8 @@ function loadCache(): HotelSearchResult[] {
   }
 
   const fromDisk = readCacheFromDisk();
-  const merged = mergeUnique([...seedHotelSearchCatalog, ...fromDisk]).slice(0, getCacheLimit());
+  const seedItems = shouldIncludeSeedCatalog() ? seedHotelSearchCatalog : [];
+  const merged = mergeUnique([...seedItems, ...fromDisk]).slice(0, getCacheLimit());
 
   memoryCache = merged;
   memoryLoadedAt = Date.now();
@@ -248,7 +259,9 @@ function sanitizeCatalogItem(item: HotelSearchResult): HotelSearchResult | null 
     normalizeWhitespace(decodeEscapedUnicode(item.address || `${name}, ${city}`)) || `${name}, ${city}`;
 
   const externalIdRaw = normalizeWhitespace(decodeEscapedUnicode(item.externalId || ""));
-  const externalId = externalIdRaw || `cache-${normalize(name).replace(/\s+/g, "-")}-${normalize(city).replace(/\s+/g, "-")}`;
+  const externalId =
+    externalIdRaw ||
+    `cache-${normalize(name).replace(/\s+/g, "-")}-${normalize(city).replace(/\s+/g, "-")}`;
 
   return {
     externalId,
