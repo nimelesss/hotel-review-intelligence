@@ -1,71 +1,22 @@
 # Hotel Review Intelligence
 
-B2B-платформа для гостиничного менеджмента: превращает отзывы гостей в управленческую аналитику, сегменты и рекомендации.
+B2B-платформа для руководителей гостиниц: собирает отзывы с площадок, строит explainable-аналитику и дает управленческие рекомендации.
 
-## Что уже реализовано
-- Веб-приложение на `Next.js + TypeScript + Tailwind`.
-- Экран поиска: можно найти и добавить любой отель в России.
-- Аналитика:
-  - предобработка текстов,
-  - тональность,
-  - тематический анализ,
-  - вероятностная сегментация,
-  - explainable-обоснование.
-- Dashboard с управленческой сводкой:
-  - KPI,
-  - драйверы позитива/негатива,
-  - риски,
-  - инсайты по сегментам,
-  - покрытие источников по отзывам.
-- Модуль загрузки:
-  - ручной импорт CSV/JSON,
-  - запуск сборов по площадкам,
-  - прогресс-этапы и история запусков.
-- Runtime-хранилище в `.runtime-store.json`.
+## Что уже работает
+- Поиск и добавление отелей по РФ (OSM/Nominatim + локальный кэш).
+- Импорт национального каталога отелей в систему (`/api/catalog/sync`).
+- Сбор отзывов по провайдерам (`Яндекс Карты`, `2ГИС`, `Островок`, кастомный dataset).
+- Realtime-сбор по выбранному отелю (`/api/sync/realtime-hotel`).
+- Недельная синхронизация (GitHub Actions `weekly-sync.yml`).
+- Explainable analytics: тональность, темы, сегменты, риски, рекомендации.
 
-## Российские источники отзывов
-Система поддерживает провайдеры:
-- `yandex_maps_dataset`
-- `two_gis_dataset`
-- `ostrovok_dataset`
-- `russian_travel_dataset`
+## Почему бывает "0 отзывов"
+Обычно не настроены источники сбора. Нужны:
+1. Каталог отелей (`RUSSIA_HOTELS_CATALOG_PATH` или `RUSSIA_HOTELS_CATALOG_URL`).
+2. Источники отзывов (`DEFAULT_REALTIME_TARGETS_JSON` и/или `PORTFOLIO_SYNC_TARGETS_JSON`).
+3. Для сбора без `datasetUrl` нужен runtime collector (`APIFY_TOKEN` + `APIFY_ACTOR_*`).
 
-Провайдеры работают с JSON dataset URL, например:
-
-```text
-https://api.apify.com/v2/datasets/<dataset-id>/items?token=<token>
-```
-
-## Режимы синхронизации
-1. Портфельная синхронизация (по всем отелям и таргетам).
-2. Realtime-синхронизация для выбранного отеля.
-
-### Обязательные переменные сервера
-В `/etc/hotel-review-intelligence.env`:
-
-```bash
-SYNC_TRIGGER_TOKEN=replace_with_long_random_token
-PORTFOLIO_SYNC_TARGETS_JSON=[{"hotelId":"hotel-courtyard-rostov","provider":"yandex_maps_dataset","datasetUrl":"https://api.apify.com/v2/datasets/<id>/items?token=<token>","limit":300}]
-```
-
-### Опционально: fallback для любого нового отеля
-Если для отеля нет персональных таргетов, используется:
-
-```bash
-DEFAULT_REALTIME_TARGETS_JSON=[{"provider":"yandex_maps_dataset","datasetUrl":"https://api.apify.com/v2/datasets/<id>/items?token=<token>","limit":300},{"provider":"two_gis_dataset","datasetUrl":"https://api.apify.com/v2/datasets/<id>/items?token=<token>","limit":300},{"provider":"ostrovok_dataset","datasetUrl":"https://api.apify.com/v2/datasets/<id>/items?token=<token>","limit":300}]
-```
-
-## API
-- `GET /api/hotels` — список отелей.
-- `POST /api/hotels` — создать профиль отеля.
-- `GET /api/hotels/search?q=...` — поиск отелей по РФ.
-- `GET /api/hotels/:hotelId/dashboard` — сводка.
-- `GET /api/reviews` — выборка отзывов с фильтрами.
-- `POST /api/analysis-runs/from-platform` — запуск по одному провайдеру.
-- `POST /api/sync/realtime-hotel` — запуск по всем доступным источникам для отеля.
-- `POST /api/sync/portfolio` — портфельный запуск (требует `SYNC_TRIGGER_TOKEN`).
-
-## Локальный запуск
+## Быстрый запуск локально
 Требуется `Node.js 20+`.
 
 ```bash
@@ -75,15 +26,41 @@ npm run dev
 
 Открыть: `http://localhost:3000`
 
-## Маршруты приложения
-- `/` — сводка
-- `/reviews` — отзывы
-- `/segments` — сегменты
-- `/recommendations` — рекомендации
-- `/upload` — загрузка данных
-- `/methodology` — методика
+## Основные env-переменные
+Смотрите шаблон: [`.env.example`](./.env.example)
 
-## Ограничения MVP
-- Хранилище runtime-файловое, без PostgreSQL.
-- Нет авторизации/RBAC.
-- Для «реального» охвата площадок нужны корректные dataset URL и доступы к источникам.
+Ключевые:
+- `SYNC_TRIGGER_TOKEN`
+- `RUSSIA_HOTELS_CATALOG_PATH`
+- `DEFAULT_REALTIME_TARGETS_JSON`
+- `APIFY_TOKEN`
+- `APIFY_ACTOR_YANDEX_MAPS`, `APIFY_ACTOR_TWO_GIS`, `APIFY_ACTOR_OSTROVOK`
+
+## Сбор большого каталога отелей РФ
+
+```bash
+npm run catalog:refresh -- --output data/russia-hotels-catalog.json --maxTiles 220 --limit 150000
+```
+
+Скрипт использует OpenStreetMap Overpass и сохраняет JSON-каталог с адресами/координатами.
+
+## API
+- `GET /api/hotels` — список отелей.
+- `POST /api/hotels` — создать/обновить профиль отеля.
+- `GET /api/hotels/search?q=...` — поиск отелей по РФ.
+- `GET /api/hotels/:hotelId/dashboard` — сводная аналитика.
+- `POST /api/sync/realtime-hotel` — запуск сбора для одного отеля.
+- `POST /api/sync/portfolio` — портфельный запуск (требует `SYNC_TRIGGER_TOKEN`).
+- `POST /api/catalog/sync` — импорт каталога (требует `SYNC_TRIGGER_TOKEN`).
+
+## Автосинхронизация по расписанию
+Файл: [`.github/workflows/weekly-sync.yml`](./.github/workflows/weekly-sync.yml)
+
+Что делает:
+1. На VPS обновляет национальный каталог отелей (`npm run catalog:refresh`).
+2. Вызывает `/api/catalog/sync`.
+3. Вызывает `/api/sync/portfolio` в режиме `weekly`.
+
+## Ограничения
+- Реальный охват отзывов зависит от подключенных источников (dataset URL или Apify actors).
+- В MVP используется file-based runtime store; PostgreSQL можно подключить без смены API-контрактов.
