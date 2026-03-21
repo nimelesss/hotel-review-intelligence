@@ -1,0 +1,43 @@
+name: Weekly Portfolio Sync
+
+on:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: weekly-portfolio-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger weekly sync on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script_stop: true
+          command_timeout: 15m
+          script: |
+            set -e
+            if [ -z "${{ secrets.SYNC_TRIGGER_TOKEN }}" ]; then
+              echo "SYNC_TRIGGER_TOKEN secret is missing in GitHub."
+              exit 1
+            fi
+
+            HTTP_CODE=$(curl -sS -o /tmp/weekly-sync-response.json -w "%{http_code}" \
+              -X POST "http://127.0.0.1:3100/api/sync/portfolio" \
+              -H "Authorization: Bearer ${{ secrets.SYNC_TRIGGER_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d '{"mode":"weekly"}')
+
+            cat /tmp/weekly-sync-response.json
+            if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -gt 299 ]; then
+              echo "Weekly sync failed with HTTP $HTTP_CODE"
+              exit 1
+            fi
+
+            echo "Weekly sync trigger accepted with HTTP $HTTP_CODE"
