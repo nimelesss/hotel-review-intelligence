@@ -2,12 +2,12 @@ import { Card } from "@/shared/ui/card";
 
 export function LoadingState({ label }: { label: string }) {
   return (
-    <Card className="animate-pulse">
-      <div className="h-5 w-40 rounded bg-slate-200" />
+    <Card className="anim-fade-in">
+      <div className="h-5 w-40 rounded bg-slate-200 anim-shimmer" />
       <div className="mt-3 space-y-2">
-        <div className="h-4 w-full rounded bg-slate-200" />
-        <div className="h-4 w-5/6 rounded bg-slate-200" />
-        <div className="h-4 w-4/6 rounded bg-slate-200" />
+        <div className="h-4 w-full rounded bg-slate-200 anim-shimmer" />
+        <div className="h-4 w-5/6 rounded bg-slate-200 anim-shimmer" />
+        <div className="h-4 w-4/6 rounded bg-slate-200 anim-shimmer" />
       </div>
       <p className="mt-3 text-sm text-textMuted">{label}</p>
     </Card>

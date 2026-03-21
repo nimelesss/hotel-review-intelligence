@@ -17,10 +17,11 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        "mb-6 flex flex-col gap-3 rounded-xl2 border border-border bg-panel p-5 shadow-soft md:flex-row md:items-center md:justify-between",
+        "anim-fade-up relative mb-6 flex flex-col gap-3 overflow-hidden rounded-xl2 border border-border bg-panel p-5 shadow-soft md:flex-row md:items-center md:justify-between",
         className
       )}
     >
+      <div className="anim-shimmer pointer-events-none absolute inset-0 opacity-40" />
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-bold leading-tight text-text">{title}</h1>

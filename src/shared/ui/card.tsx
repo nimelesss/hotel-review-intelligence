@@ -10,7 +10,7 @@ export function Card({
   return (
     <section
       className={cn(
-        "rounded-xl2 border border-border bg-panel p-5 shadow-panel",
+        "anim-fade-up rounded-xl2 border border-border bg-panel p-5 shadow-panel transition-transform duration-300 hover:-translate-y-0.5",
         className
       )}
     >

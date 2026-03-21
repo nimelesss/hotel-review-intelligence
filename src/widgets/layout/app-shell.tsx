@@ -13,8 +13,12 @@ const NAV_LINKS = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen">
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div className="anim-glow-drift absolute -left-20 top-24 h-72 w-72 rounded-full bg-cyan-200/35 blur-3xl" />
+        <div className="anim-glow-drift absolute -right-20 bottom-12 h-80 w-80 rounded-full bg-blue-200/30 blur-3xl" />
+      </div>
       <div className="mx-auto grid max-w-[1600px] grid-cols-1 gap-4 p-4 lg:grid-cols-[260px_1fr]">
-        <aside className="rounded-xl2 border border-border bg-panel p-4 shadow-panel lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]">
+        <aside className="anim-fade-up rounded-xl2 border border-border bg-panel p-4 shadow-panel lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]">
           <div className="mb-6 border-b border-border pb-4">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-textMuted">
               B2B SaaS
@@ -29,7 +33,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={link.href}
                 href={link.href}
-                className="block rounded-lg px-3 py-2 text-sm font-medium text-text transition-colors hover:bg-panelMuted"
+                className="nav-link block rounded-lg px-3 py-2 text-sm font-medium text-text transition-colors hover:bg-panelMuted"
               >
                 {link.label}
               </Link>
