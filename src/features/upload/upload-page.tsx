@@ -29,6 +29,14 @@ interface RunsResponse {
   items: AnalysisRun[];
 }
 
+interface SyncResultResponse {
+  result: {
+    targetsStarted: number;
+    runs: AnalysisRun[];
+    warnings: string[];
+  };
+}
+
 function presentRunSource(run: AnalysisRun): string {
   const source = (run.provider || run.sourceType) as string;
   switch (source) {
@@ -248,6 +256,47 @@ export function UploadPage() {
     }
   };
 
+  const onRealtimeAllPlatforms = async () => {
+    if (!selectedHotelId) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetchJson<SyncResultResponse>("/api/sync/realtime-hotel", {
+        method: "POST",
+        body: JSON.stringify({
+          hotelId: selectedHotelId
+        })
+      });
+      const newRuns = response.result.runs ?? [];
+      if (newRuns.length) {
+        setRuns((prev) => {
+          const map = new Map(prev.map((run) => [run.id, run]));
+          newRuns.forEach((run) => map.set(run.id, run));
+          return [...map.values()].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+        });
+        setActiveRunId(newRuns[0].id);
+      }
+      const warningText =
+        response.result.warnings.length > 0
+          ? ` Warnings: ${response.result.warnings.join(" | ")}`
+          : "";
+      setMessage(
+        `Realtime multi-platform sync started: ${response.result.targetsStarted} target(s).${warningText}`
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Realtime multi-platform sync start failed."
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return <LoadingState label="Preparing upload and ingestion module..." />;
   }
@@ -385,10 +434,17 @@ export function UploadPage() {
           >
             Fetch Platform Reviews + Analyze
           </Button>
+          <Button
+            variant="secondary"
+            onClick={onRealtimeAllPlatforms}
+            disabled={busy || !selectedHotelId}
+          >
+            Realtime Sync: All Configured Platforms
+          </Button>
           <Badge variant="info">Pipeline: fetch - normalize - dedupe - analyze</Badge>
         </div>
         <p className="mt-2 text-xs text-textMuted">
-          Focused on Russian platforms. Connect Yandex Maps, 2GIS, and local aggregators via dataset export URL.
+          Single-source run: fill provider + dataset URL. Multi-source realtime run: configure server targets and click the secondary button.
         </p>
       </Card>
 
