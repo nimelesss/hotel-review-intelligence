@@ -30,16 +30,20 @@ jobs:
             npm ci
             npm run build
             systemctl restart hotel-review-intelligence
+            for i in $(seq 1 20); do
+              if systemctl is-active --quiet hotel-review-intelligence; then
+                echo "Service is active"
+                break
+              fi
+              sleep 1
+            done
             systemctl is-active --quiet hotel-review-intelligence
             for i in $(seq 1 20); do
               if curl -fsS http://127.0.0.1:3100/api/hotels >/dev/null; then
                 echo "Health-check passed"
-                exit 0
+                break
               fi
               sleep 2
             done
-            echo "Health-check failed after retries"
-            systemctl status --no-pager hotel-review-intelligence | sed -n '1,80p'
-            journalctl -u hotel-review-intelligence -n 80 --no-pager
-            exit 1
+            curl -fsS http://127.0.0.1:3100/api/hotels >/dev/null
             echo "Deploy completed successfully"
