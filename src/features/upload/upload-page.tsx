@@ -363,7 +363,7 @@ export function UploadPage() {
           <Button onClick={onPlatformAnalyze} disabled={busy || !selectedHotelId}>
             Fetch Platform Reviews + Analyze
           </Button>
-          <Badge variant="info">Pipeline: fetch -> normalize -> dedupe -> analyze</Badge>
+          <Badge variant="info">Pipeline: fetch → normalize → dedupe → analyze</Badge>
         </div>
         <p className="mt-2 text-xs text-textMuted">
           Google Places requires server env key: GOOGLE_PLACES_API_KEY. For higher volume and multi-platform imports use Apify dataset URL.
