@@ -101,8 +101,18 @@ export function DashboardPage() {
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Не удалось загрузить сводку по отелю.";
-        if (message.toLocaleLowerCase("ru-RU").includes("отель не найден")) {
-          setSelectedHotelId("");
+        const normalizedMessage = message.toLocaleLowerCase("ru-RU");
+        if (
+          normalizedMessage.includes("отель не найден") ||
+          normalizedMessage.includes("hotel not found")
+        ) {
+          setSelectedHotelId((current) => {
+            const fallback = hotels[0]?.id || "";
+            if (fallback && fallback !== current) {
+              return fallback;
+            }
+            return "";
+          });
           setDashboard(null);
           setError(null);
           return;
@@ -113,7 +123,7 @@ export function DashboardPage() {
       }
     };
     void loadDashboard();
-  }, [selectedHotelId, reloadKey]);
+  }, [selectedHotelId, reloadKey, hotels]);
 
   const selectedHotel = useMemo(
     () => hotels.find((hotel) => hotel.id === selectedHotelId),
@@ -349,6 +359,29 @@ export function DashboardPage() {
       {syncMessage ? <Badge variant="success">{syncMessage}</Badge> : null}
 
       <AnalysisProgress run={latestRun} />
+
+      {aggregate.totalReviews === 0 ? (
+        <Card>
+          <CardTitle
+            title="Отзывы еще не загружены"
+            subtitle="Профиль отеля создан, но база отзывов пока пустая."
+          />
+          <p className="text-sm text-textMuted">
+            Чтобы появилась аналитика, запустите сбор по площадкам кнопкой
+            {" "}
+            «Собрать отзывы по площадкам».
+          </p>
+          <p className="mt-2 text-sm text-textMuted">
+            Если после запуска данные не появились, проверьте серверные переменные:
+            {" "}
+            <code>DEFAULT_REALTIME_TARGETS_JSON</code>,
+            {" "}
+            <code>PORTFOLIO_SYNC_TARGETS_JSON</code>
+            {" "}
+            и доступность dataset URL источников.
+          </p>
+        </Card>
+      ) : null}
 
       <Card>
         <div className="grid gap-4 lg:grid-cols-[1fr_auto]">

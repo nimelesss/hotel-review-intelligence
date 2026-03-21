@@ -8,9 +8,12 @@ export async function GET(_: Request, context: any) {
     const payload = getDashboardPayload(hotelId);
     return NextResponse.json(payload);
   } catch (error) {
-    return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Ошибка формирования сводки." },
-      { status: 400 }
-    );
+    const message =
+      error instanceof Error ? error.message : "Ошибка формирования сводки.";
+    const status = message.toLocaleLowerCase("ru-RU").includes("отель не найден")
+      ? 404
+      : 400;
+
+    return NextResponse.json({ message }, { status });
   }
 }

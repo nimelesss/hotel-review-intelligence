@@ -1,10 +1,12 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { HotelSearchResult } from "@/entities/types";
 import {
   hydrateHotelCatalogFromRemoteSource,
   searchHotelCatalog,
   upsertHotelCatalog
 } from "@/server/search/hotel-search-cache";
+import { getRepository } from "@/server/repositories";
+import { decodeEscapedUnicode, normalizeSearchText, normalizeWhitespace } from "@/shared/lib/text";
 
 interface NominatimItem {
   place_id: number;
@@ -63,11 +65,30 @@ const CHAIN_BRANDS = new Set([
   "accor"
 ]);
 
-const MAX_PARALLEL_VARIANTS = 4;
+const CITY_ALIASES: Record<string, string[]> = {
+  "ростов-на-дону": ["rostov-on-don", "rostov na donu"],
+  "санкт-петербург": ["saint petersburg", "sankt petersburg", "st petersburg"],
+  "нижний новгород": ["nizhny novgorod"],
+  "екатеринбург": ["yekaterinburg", "ekaterinburg"],
+  "челябинск": ["chelyabinsk"],
+  "новосибирск": ["novosibirsk"],
+  "волгоград": ["volgograd"],
+  "владивосток": ["vladivostok"],
+  "краснодар": ["krasnodar"],
+  "калининград": ["kaliningrad"],
+  "казань": ["kazan"],
+  "сочи": ["sochi"],
+  "москва": ["moscow"],
+  "пермь": ["perm"],
+  "самара": ["samara"],
+  "уфа": ["ufa"]
+};
+
+const MAX_PARALLEL_VARIANTS = 6;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const query = (searchParams.get("q") || "").trim();
+  const query = normalizeWhitespace(decodeEscapedUnicode(searchParams.get("q") || ""));
   const limit = clampLimit(searchParams.get("limit"));
 
   if (query.length < 2) {
@@ -79,23 +100,40 @@ export async function GET(request: Request) {
 
   try {
     await hydrateHotelCatalogFromRemoteSource();
-    const localSuggestions = searchHotelCatalog(query, Math.max(limit, 6));
-    const variants = buildQueryVariants(query).slice(0, MAX_PARALLEL_VARIANTS);
 
-    const responses = await Promise.all(
-      variants.map((variant) => requestNominatim(variant, Math.max(25, limit * 4)))
+    const localSuggestions = searchHotelCatalog(query, Math.max(limit, 10));
+    const existingHotels = getRepository().listHotels().map((hotel) => ({
+      externalId: hotel.externalId || hotel.id,
+      name: hotel.name,
+      city: hotel.city,
+      country: hotel.country,
+      address: hotel.address,
+      coordinates: hotel.coordinates,
+      source: "catalog_import" as const
+    }));
+
+    const variants = buildQueryVariants(query).slice(0, MAX_PARALLEL_VARIANTS);
+    const responses = await Promise.allSettled(
+      variants.map((variant) => requestNominatim(variant, Math.max(30, limit * 5)))
     );
 
     const remoteItems = responses
-      .flat()
-      .filter(isHotelEntity)
+      .filter((result): result is PromiseFulfilledResult<NominatimItem[]> => result.status === "fulfilled")
+      .flatMap((result) => result.value)
+      .filter((item) => isHotelEntity(item, query))
       .map(mapNominatimToHotelSearchResult)
       .filter((item): item is HotelSearchResult => !!item.name && !!item.city)
       .filter((item) => !isBrandOnlyResult(item, query));
 
-    upsertHotelCatalog(remoteItems);
+    if (remoteItems.length) {
+      upsertHotelCatalog(remoteItems);
+    }
 
-    const merged = rankAndLimitResults([...localSuggestions, ...remoteItems], query, limit);
+    const merged = rankAndLimitResults(
+      [...existingHotels, ...localSuggestions, ...remoteItems],
+      query,
+      limit
+    );
 
     return NextResponse.json({ items: merged });
   } catch (error) {
@@ -135,7 +173,7 @@ async function requestNominatim(query: string, limit: number): Promise<Nominatim
 }
 
 function buildQueryVariants(input: string): string[] {
-  const query = input.trim();
+  const query = normalizeWhitespace(input);
   const normalized = normalize(query);
   const variants = new Set<string>();
 
@@ -154,10 +192,39 @@ function buildQueryVariants(input: string): string[] {
     variants.add(compact);
   }
 
+  const noDash = query.replace(/-/g, " ").replace(/\s+/g, " ").trim();
+  if (noDash !== query) {
+    variants.add(noDash);
+  }
+
+  const cityAliasVariants = expandCityAliases(query);
+  cityAliasVariants.forEach((variant) => variants.add(variant));
+
   return [...variants];
 }
 
-function isHotelEntity(item: NominatimItem): boolean {
+function expandCityAliases(query: string): string[] {
+  const normalized = normalize(query);
+  const results = new Set<string>();
+
+  Object.entries(CITY_ALIASES).forEach(([cityRu, aliases]) => {
+    if (normalized.includes(cityRu)) {
+      aliases.forEach((alias) => {
+        results.add(query.replace(new RegExp(cityRu, "i"), alias));
+      });
+    }
+
+    aliases.forEach((alias) => {
+      if (normalized.includes(alias)) {
+        results.add(query.replace(new RegExp(alias, "i"), cityRu));
+      }
+    });
+  });
+
+  return [...results];
+}
+
+function isHotelEntity(item: NominatimItem, query: string): boolean {
   const city = extractCity(item);
   if (!city) {
     return false;
@@ -172,7 +239,20 @@ function isHotelEntity(item: NominatimItem): boolean {
   }
 
   const haystack = normalize(`${item.name || ""} ${item.display_name || ""}`);
-  return HOTEL_KEYWORDS.some((keyword) => haystack.includes(keyword));
+  if (HOTEL_KEYWORDS.some((keyword) => haystack.includes(keyword))) {
+    return true;
+  }
+
+  const queryTokens = normalize(query)
+    .split(" ")
+    .filter((token) => token.length >= 3);
+
+  if (!queryTokens.length) {
+    return false;
+  }
+
+  const matched = queryTokens.filter((token) => haystack.includes(token)).length;
+  return matched >= Math.min(2, queryTokens.length);
 }
 
 function isBrandOnlyResult(item: HotelSearchResult, query: string): boolean {
@@ -267,14 +347,14 @@ function scoreResult(item: HotelSearchResult, query: string): number {
 
 function mapNominatimToHotelSearchResult(item: NominatimItem): HotelSearchResult {
   const city = extractCity(item) || "Не указан";
-  const displayName = item.display_name || "";
-  const normalizedName = normalizeHotelName(item.name || displayName);
+  const displayName = decodeEscapedUnicode(item.display_name || "");
+  const normalizedName = normalizeHotelName(decodeEscapedUnicode(item.name || displayName));
 
   return {
     externalId: String(item.place_id),
     name: normalizedName,
     city,
-    country: item.address?.country || "Россия",
+    country: decodeEscapedUnicode(item.address?.country || "Россия"),
     address: displayName || `${normalizedName}, ${city}`,
     coordinates:
       item.lat && item.lon
@@ -292,27 +372,24 @@ function normalizeHotelName(value: string): string {
   if (!candidate) {
     return value.trim() || "Неизвестный отель";
   }
-  return candidate;
+  return normalizeWhitespace(candidate);
 }
 
 function extractCity(item: NominatimItem): string {
-  return (
-    item.address?.city ||
-    item.address?.town ||
-    item.address?.village ||
-    item.address?.municipality ||
-    item.address?.state ||
-    ""
+  return normalizeWhitespace(
+    decodeEscapedUnicode(
+      item.address?.city ||
+        item.address?.town ||
+        item.address?.village ||
+        item.address?.municipality ||
+        item.address?.state ||
+        ""
+    )
   );
 }
 
 function normalize(value: string): string {
-  return value
-    .toLocaleLowerCase("ru-RU")
-    .replace(/ё/g, "е")
-    .replace(/[^\p{L}\p{N}\s-]+/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return normalizeSearchText(value);
 }
 
 function clampLimit(value: string | null): number {
@@ -320,5 +397,5 @@ function clampLimit(value: string | null): number {
   if (!Number.isFinite(parsed)) {
     return 8;
   }
-  return Math.min(12, Math.max(4, Math.floor(parsed)));
+  return Math.min(16, Math.max(4, Math.floor(parsed)));
 }
