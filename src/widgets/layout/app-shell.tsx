@@ -2,12 +2,12 @@ import Link from "next/link";
 import { APP_NAME } from "@/shared/config/constants";
 
 const NAV_LINKS = [
-  { href: "/", label: "Dashboard" },
-  { href: "/reviews", label: "Review Explorer" },
-  { href: "/segments", label: "Segment Analysis" },
-  { href: "/recommendations", label: "Recommendations" },
-  { href: "/upload", label: "Data Upload" },
-  { href: "/methodology", label: "Methodology" }
+  { href: "/", label: "Сводка" },
+  { href: "/reviews", label: "Отзывы" },
+  { href: "/segments", label: "Сегменты" },
+  { href: "/recommendations", label: "Рекомендации" },
+  { href: "/upload", label: "Загрузка данных" },
+  { href: "/methodology", label: "Методика" }
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -25,7 +25,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </p>
             <h2 className="mt-2 text-lg font-bold text-text">{APP_NAME}</h2>
             <p className="mt-2 text-xs text-textMuted">
-              Hospitality Review Intelligence Platform
+              Аналитика отзывов для управления гостиницей
             </p>
           </div>
           <nav className="space-y-1">
@@ -40,7 +40,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
           <div className="mt-6 rounded-lg border border-border bg-panelMuted p-3 text-xs text-textMuted">
-            Product scope: MVP with explainable analytics and readiness for multi-hotel SaaS.
+            Версия MVP: приоритет на управленческие решения по реальным отзывам.
           </div>
         </aside>
         <main className="pb-8">{children}</main>

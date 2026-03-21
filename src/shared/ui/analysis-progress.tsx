@@ -4,12 +4,12 @@ import { Badge } from "@/shared/ui/badge";
 import { cn } from "@/shared/lib/cn";
 
 const STAGES: Array<{ id: string; label: string }> = [
-  { id: "fetching_reviews", label: "Collecting reviews from platform" },
-  { id: "normalizing_reviews", label: "Normalizing text and metadata fields" },
-  { id: "deduping_reviews", label: "Deduplicating and validating rows" },
-  { id: "analyzing_reviews", label: "Running sentiment/topic/segment analysis" },
-  { id: "aggregating_insights", label: "Building hotel-level aggregates and signals" },
-  { id: "completed", label: "Building dashboards and recommendations" }
+  { id: "fetching_reviews", label: "Сбор отзывов с площадок" },
+  { id: "normalizing_reviews", label: "Нормализация текста и метаданных" },
+  { id: "deduping_reviews", label: "Проверка качества и удаление дублей" },
+  { id: "analyzing_reviews", label: "Анализ тональности, тем и сегментов" },
+  { id: "aggregating_insights", label: "Расчет агрегированных метрик и рисков" },
+  { id: "completed", label: "Подготовка сводки и рекомендаций" }
 ];
 
 export function AnalysisProgress({
@@ -32,15 +32,15 @@ export function AnalysisProgress({
     <Card className={cn("relative overflow-hidden", className)}>
       <div className="anim-shimmer pointer-events-none absolute inset-0 opacity-45" />
       <CardTitle
-        title="Processing Status"
-        subtitle="System is ingesting and analyzing reviews. You can monitor live progress."
+        title="Статус обработки"
+        subtitle="Система выполняет сбор и анализ отзывов. Прогресс обновляется автоматически."
       />
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant={isFailed ? "danger" : isDone ? "success" : "warning"}>
-          {run.status.toUpperCase()}
+          {translateRunStatus(run.status)}
         </Badge>
-        <Badge variant="info">Progress {pct}%</Badge>
-        {run.provider ? <Badge variant="default">Provider: {run.provider}</Badge> : null}
+        <Badge variant="info">Готовность {pct}%</Badge>
+        {run.provider ? <Badge variant="default">Источник: {run.provider}</Badge> : null}
       </div>
 
       <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-200">
@@ -88,9 +88,20 @@ export function AnalysisProgress({
           {run.errorMessage}
         </p>
       ) : null}
-      {run.notes ? (
-        <p className="mt-3 text-xs text-textMuted">{run.notes}</p>
-      ) : null}
+      {run.notes ? <p className="mt-3 text-xs text-textMuted">{run.notes}</p> : null}
     </Card>
   );
+}
+
+function translateRunStatus(status: AnalysisRun["status"]): string {
+  if (status === "completed") {
+    return "Завершено";
+  }
+  if (status === "running") {
+    return "В работе";
+  }
+  if (status === "failed") {
+    return "Ошибка";
+  }
+  return "Ожидание";
 }

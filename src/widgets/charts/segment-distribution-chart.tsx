@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  Legend
-} from "recharts";
+import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { DistributionItem, SegmentId } from "@/entities/types";
 import { formatPercent } from "@/shared/lib/format";
 

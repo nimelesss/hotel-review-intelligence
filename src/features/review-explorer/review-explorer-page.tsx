@@ -8,7 +8,14 @@ import {
   SentimentLabel,
   TopicId
 } from "@/entities/types";
-import { SEGMENTS, SENTIMENT_LABELS, TOPICS, SEGMENT_LABELS, TOPIC_LABELS } from "@/shared/config/taxonomy";
+import {
+  SEGMENT_LABELS,
+  SEGMENTS,
+  SENTIMENT_LABELS,
+  TOPIC_LABELS,
+  TOPICS
+} from "@/shared/config/taxonomy";
+import { REVIEW_SOURCE_LABELS, REVIEW_SOURCE_PRIORITY } from "@/shared/config/sources";
 import { formatDate } from "@/shared/lib/format";
 import { fetchJson } from "@/shared/lib/http";
 import { sentimentVariant } from "@/shared/lib/presentation";
@@ -22,20 +29,6 @@ import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/states";
 interface HotelListResponse {
   items: Hotel[];
 }
-
-const SOURCES = [
-  "yandex",
-  "2gis",
-  "flamp",
-  "ostrovok",
-  "otzovik",
-  "sutochno",
-  "bronevik",
-  "booking.com",
-  "tripadvisor",
-  "manual_upload",
-  "mock_api"
-];
 
 interface FiltersState {
   sentiment: SentimentLabel | "";
@@ -76,9 +69,12 @@ export function ReviewExplorerPage() {
         setHotels(response.items);
         if (response.items[0]) {
           setSelectedHotelId(response.items[0].id);
+        } else {
+          setLoading(false);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Ошибка загрузки отелей");
+        setError(err instanceof Error ? err.message : "Ошибка загрузки отелей.");
+        setLoading(false);
       }
     };
     void loadHotels();
@@ -92,9 +88,7 @@ export function ReviewExplorerPage() {
       setLoading(true);
       setError(null);
       try {
-        const params = new URLSearchParams({
-          hotelId: selectedHotelId
-        });
+        const params = new URLSearchParams({ hotelId: selectedHotelId });
         if (filters.sentiment) params.set("sentiment", filters.sentiment);
         if (filters.segment) params.set("segment", filters.segment);
         if (filters.topic) params.set("topic", filters.topic);
@@ -104,6 +98,7 @@ export function ReviewExplorerPage() {
         if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
         if (filters.dateTo) params.set("dateTo", filters.dateTo);
         if (filters.search) params.set("search", filters.search);
+
         const response = await fetchJson<ReviewsQueryResult>(
           `/api/reviews?${params.toString()}`
         );
@@ -112,7 +107,7 @@ export function ReviewExplorerPage() {
           setSelectedReviewId((prev) => prev ?? response.items[0].review.id);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Ошибка загрузки отзывов");
+        setError(err instanceof Error ? err.message : "Ошибка загрузки отзывов.");
       } finally {
         setLoading(false);
       }
@@ -120,7 +115,7 @@ export function ReviewExplorerPage() {
 
     const timeoutId = setTimeout(() => {
       void loadReviews();
-    }, 200);
+    }, 180);
     return () => clearTimeout(timeoutId);
   }, [selectedHotelId, filters]);
 
@@ -134,15 +129,15 @@ export function ReviewExplorerPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Review Explorer"
-        subtitle="Поиск, фильтрация и explainable-анализ каждого отзыва."
-        badge="MVP"
+        title="Отзывы"
+        subtitle="Фильтрация, поиск и объяснимый разбор каждого отзыва."
+        badge="Анализ отзывов"
       />
 
       <Card>
         <CardTitle
           title="Фильтры"
-          subtitle="Sentiment, segment, topic, source, rating и текстовый поиск."
+          subtitle="Тональность, сегмент, тема, источник, оценка, период и текстовый поиск."
         />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Select
@@ -211,14 +206,14 @@ export function ReviewExplorerPage() {
             }
           >
             <option value="">Все источники</option>
-            {SOURCES.map((source) => (
+            {REVIEW_SOURCE_PRIORITY.map((source) => (
               <option key={source} value={source}>
-                {source}
+                {REVIEW_SOURCE_LABELS[source]}
               </option>
             ))}
           </Select>
           <Input
-            placeholder="rating min"
+            placeholder="Оценка от"
             value={filters.ratingMin}
             onChange={(event) =>
               setFilters((prev) => ({
@@ -228,7 +223,7 @@ export function ReviewExplorerPage() {
             }
           />
           <Input
-            placeholder="rating max"
+            placeholder="Оценка до"
             value={filters.ratingMax}
             onChange={(event) =>
               setFilters((prev) => ({
@@ -258,8 +253,8 @@ export function ReviewExplorerPage() {
             }
           />
           <Input
-            className="xl:col-span-2 md:col-span-2"
-            placeholder="Поиск по тексту/keywords"
+            className="md:col-span-2 xl:col-span-2"
+            placeholder="Поиск по тексту отзыва или ключевым словам"
             value={filters.search}
             onChange={(event) =>
               setFilters((prev) => ({
@@ -279,7 +274,7 @@ export function ReviewExplorerPage() {
             }`}
             onClick={() => setViewMode("table")}
           >
-            Table view
+            Таблица
           </button>
           <button
             type="button"
@@ -290,20 +285,18 @@ export function ReviewExplorerPage() {
             }`}
             onClick={() => setViewMode("cards")}
           >
-            Card view
+            Карточки
           </button>
         </div>
       </Card>
 
       {loading && !result ? <LoadingState label="Загружаю отзывы..." /> : null}
-      {error && !result ? (
-        <ErrorState title="Ошибка загрузки" description={error} />
-      ) : null}
+      {error && !result ? <ErrorState title="Ошибка загрузки" description={error} /> : null}
 
       {!loading && result && result.total === 0 ? (
         <EmptyState
           title="Отзывы не найдены"
-          description="Измените фильтры или загрузите дополнительные данные."
+          description="Измените фильтры или выполните новый сбор данных."
         />
       ) : null}
 
@@ -321,9 +314,9 @@ export function ReviewExplorerPage() {
                     <tr className="border-b border-border text-xs uppercase tracking-[0.1em] text-textMuted">
                       <th className="px-2 py-3">Дата</th>
                       <th className="px-2 py-3">Источник</th>
-                      <th className="px-2 py-3">Rating</th>
-                      <th className="px-2 py-3">Sentiment</th>
-                      <th className="px-2 py-3">Segment</th>
+                      <th className="px-2 py-3">Оценка</th>
+                      <th className="px-2 py-3">Тональность</th>
+                      <th className="px-2 py-3">Сегмент</th>
                       <th className="px-2 py-3">Текст</th>
                     </tr>
                   </thead>
@@ -335,19 +328,17 @@ export function ReviewExplorerPage() {
                         onClick={() => setSelectedReviewId(item.review.id)}
                       >
                         <td className="px-2 py-3">{formatDate(item.review.reviewDate)}</td>
-                        <td className="px-2 py-3">{item.review.source}</td>
+                        <td className="px-2 py-3">
+                          {REVIEW_SOURCE_LABELS[item.review.source] || item.review.source}
+                        </td>
                         <td className="px-2 py-3">{item.review.rating.toFixed(1)}</td>
                         <td className="px-2 py-3">
                           <Badge variant={sentimentVariant(item.analysis.sentimentLabel)}>
                             {SENTIMENT_LABELS[item.analysis.sentimentLabel]}
                           </Badge>
                         </td>
-                        <td className="px-2 py-3">
-                          {SEGMENT_LABELS[item.analysis.primarySegment]}
-                        </td>
-                        <td className="max-w-[380px] truncate px-2 py-3">
-                          {item.review.text}
-                        </td>
+                        <td className="px-2 py-3">{SEGMENT_LABELS[item.analysis.primarySegment]}</td>
+                        <td className="max-w-[380px] truncate px-2 py-3">{item.review.text}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -365,14 +356,14 @@ export function ReviewExplorerPage() {
                       <Badge variant={sentimentVariant(item.analysis.sentimentLabel)}>
                         {SENTIMENT_LABELS[item.analysis.sentimentLabel]}
                       </Badge>
-                      <Badge variant="info">
-                        {SEGMENT_LABELS[item.analysis.primarySegment]}
+                      <Badge variant="info">{SEGMENT_LABELS[item.analysis.primarySegment]}</Badge>
+                      <Badge variant="default">
+                        {REVIEW_SOURCE_LABELS[item.review.source] || item.review.source}
                       </Badge>
-                      <Badge variant="default">{item.review.source}</Badge>
                     </div>
                     <p className="mt-2 text-sm">{item.review.text}</p>
                     <p className="mt-1 text-xs text-textMuted">
-                      {formatDate(item.review.reviewDate)} | rating {item.review.rating.toFixed(1)}
+                      {formatDate(item.review.reviewDate)} | оценка {item.review.rating.toFixed(1)}
                     </p>
                   </article>
                 ))}
@@ -381,8 +372,8 @@ export function ReviewExplorerPage() {
           </Card>
           <Card>
             <CardTitle
-              title="Explainable Detail"
-              subtitle="Почему отзыв получил текущую классификацию."
+              title="Объяснение по отзыву"
+              subtitle="Какие признаки дали текущую классификацию."
             />
             {selected ? (
               <div className="space-y-3 text-sm">
@@ -390,11 +381,9 @@ export function ReviewExplorerPage() {
                   <Badge variant={sentimentVariant(selected.analysis.sentimentLabel)}>
                     {SENTIMENT_LABELS[selected.analysis.sentimentLabel]}
                   </Badge>
-                  <Badge variant="info">
-                    {SEGMENT_LABELS[selected.analysis.primarySegment]}
-                  </Badge>
+                  <Badge variant="info">{SEGMENT_LABELS[selected.analysis.primarySegment]}</Badge>
                   <Badge variant="default">
-                    Confidence {(selected.analysis.confidence * 100).toFixed(1)}%
+                    Уверенность {(selected.analysis.confidence * 100).toFixed(1)}%
                   </Badge>
                 </div>
                 <p>{selected.review.text}</p>
@@ -412,19 +401,19 @@ export function ReviewExplorerPage() {
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.1em] text-textMuted">
-                    Explanation
+                    Обоснование
                   </p>
                   <ul className="mt-2 space-y-2">
                     {selected.analysis.explanation.map((entry) => (
                       <li
-                        key={entry.title}
+                        key={`${entry.type}-${entry.title}`}
                         className="rounded-lg border border-border bg-panelMuted p-2"
                       >
                         <p className="font-semibold">{entry.title}</p>
                         <p className="text-xs text-textMuted">{entry.details}</p>
                         {entry.evidence.length ? (
                           <p className="mt-1 text-xs text-textMuted">
-                            Evidence: {entry.evidence.join("; ")}
+                            Основания: {entry.evidence.join("; ")}
                           </p>
                         ) : null}
                       </li>
@@ -433,7 +422,7 @@ export function ReviewExplorerPage() {
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-textMuted">Выберите отзыв из таблицы.</p>
+              <p className="text-sm text-textMuted">Выберите отзыв из списка.</p>
             )}
           </Card>
         </div>

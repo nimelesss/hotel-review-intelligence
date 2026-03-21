@@ -41,23 +41,23 @@ function presentRunSource(run: AnalysisRun): string {
   const source = (run.provider || run.sourceType) as string;
   switch (source) {
     case "yandex_maps_dataset":
-      return "Yandex Maps";
+      return "Яндекс Карты";
     case "two_gis_dataset":
-      return "2GIS / Flamp";
+      return "2ГИС / Flamp";
+    case "ostrovok_dataset":
+      return "Островок";
     case "russian_travel_dataset":
-      return "Russian Aggregators Mix";
+      return "Комбинированный набор площадок";
     case "apify_dataset":
       return "Dataset connector";
-    case "google_places":
-      return "Legacy provider (disabled)";
     default:
       return source;
   }
 }
 
 const SAMPLE_CSV = `source,sourceReviewId,reviewDate,rating,title,text,language,authorName,stayTypeRaw
-booking.com,new-101,2026-03-10,8.6,Business trip,"Quick check-in, stable Wi-Fi, good desk for work.",ru,Ivan,Business
-yandex,new-102,2026-03-12,6.4,,\"Parking was overloaded and reception queue was slow.\",ru,Maria,Transit`;
+booking.com,new-101,2026-03-10,8.6,Командировка,"Быстрое заселение, стабильный Wi-Fi, удобно работать за столом.",ru,Иван,Business
+yandex,new-102,2026-03-12,6.4,,\"Парковка перегружена, на ресепшн была очередь.\",ru,Мария,Transit`;
 
 export function UploadPage() {
   const [hotels, setHotels] = useState<Hotel[]>([]);
@@ -76,7 +76,7 @@ export function UploadPage() {
   const [newHotel, setNewHotel] = useState<CreateHotelRequest>({
     name: "",
     city: "",
-    country: "Russia",
+    country: "Россия",
     brand: "",
     category: "4*",
     address: "",
@@ -116,7 +116,10 @@ export function UploadPage() {
   }, [runs, selectedHotelId]);
 
   const activeRun = useMemo(
-    () => runs.find((run) => run.id === activeRunId) || runs.find((run) => run.status === "running") || null,
+    () =>
+      runs.find((run) => run.id === activeRunId) ||
+      runs.find((run) => run.status === "running") ||
+      null,
     [runs, activeRunId]
   );
 
@@ -128,7 +131,7 @@ export function UploadPage() {
         setSelectedHotelId((prev) => prev || hotelsResponse.items[0].id);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load hotels.");
+      setError(err instanceof Error ? err.message : "Не удалось загрузить отели.");
     } finally {
       setLoading(false);
     }
@@ -136,15 +139,13 @@ export function UploadPage() {
 
   async function loadRuns(hotelId: string) {
     try {
-      const response = await fetchJson<RunsResponse>(
-        `/api/analysis-runs?hotelId=${hotelId}`
-      );
+      const response = await fetchJson<RunsResponse>(`/api/analysis-runs?hotelId=${hotelId}`);
       setRuns(response.items);
       if (!activeRunId && response.items[0]) {
         setActiveRunId(response.items[0].id);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load analysis runs.");
+      setError(err instanceof Error ? err.message : "Не удалось загрузить историю запусков.");
     }
   }
 
@@ -159,9 +160,9 @@ export function UploadPage() {
       });
       setHotels((prev) => [response.item, ...prev.filter((item) => item.id !== response.item.id)]);
       setSelectedHotelId(response.item.id);
-      setMessage(`Hotel profile created: ${response.item.name}`);
+      setMessage(`Профиль создан: ${response.item.name}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Create hotel failed.");
+      setError(err instanceof Error ? err.message : "Не удалось создать профиль.");
     } finally {
       setBusy(false);
     }
@@ -185,9 +186,9 @@ export function UploadPage() {
         })
       });
       setPreview(response);
-      setMessage("Preview completed.");
+      setMessage("Предпросмотр завершен.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Preview failed.");
+      setError(err instanceof Error ? err.message : "Ошибка предпросмотра.");
     } finally {
       setBusy(false);
     }
@@ -216,9 +217,9 @@ export function UploadPage() {
       setPreview(response.preview);
       setRuns((prev) => [response.run, ...prev.filter((run) => run.id !== response.run.id)]);
       setActiveRunId(response.run.id);
-      setMessage(`Import done. Processed reviews: ${response.run.totalReviewsProcessed}`);
+      setMessage(`Импорт завершен. Обработано отзывов: ${response.run.totalReviewsProcessed}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Import failed.");
+      setError(err instanceof Error ? err.message : "Ошибка импорта.");
     } finally {
       setBusy(false);
     }
@@ -232,25 +233,22 @@ export function UploadPage() {
     setError(null);
     setMessage(null);
     try {
-      const response = await fetchJson<{ run: AnalysisRun }>(
-        "/api/analysis-runs/from-platform",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            hotelId: selectedHotelId,
-            provider: platformProvider,
-            query: platformQuery,
-            limit: Number(platformLimit || 120),
-            language: "ru",
-            datasetUrl: datasetUrl.trim()
-          })
-        }
-      );
+      const response = await fetchJson<{ run: AnalysisRun }>("/api/analysis-runs/from-platform", {
+        method: "POST",
+        body: JSON.stringify({
+          hotelId: selectedHotelId,
+          provider: platformProvider,
+          query: platformQuery,
+          limit: Number(platformLimit || 120),
+          language: "ru",
+          datasetUrl: datasetUrl.trim()
+        })
+      });
       setRuns((prev) => [response.run, ...prev.filter((item) => item.id !== response.run.id)]);
       setActiveRunId(response.run.id);
-      setMessage("Platform ingestion started. Processing is running in background.");
+      setMessage("Запуск принят. Сбор и обработка выполняются в фоне.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Platform ingestion start failed.");
+      setError(err instanceof Error ? err.message : "Не удалось запустить сбор.");
     } finally {
       setBusy(false);
     }
@@ -279,83 +277,76 @@ export function UploadPage() {
         });
         setActiveRunId(newRuns[0].id);
       }
-      const warningText =
-        response.result.warnings.length > 0
-          ? ` Warnings: ${response.result.warnings.join(" | ")}`
-          : "";
-      setMessage(
-        `Realtime multi-platform sync started: ${response.result.targetsStarted} target(s).${warningText}`
-      );
+      const warningText = response.result.warnings.length
+        ? ` Предупреждения: ${response.result.warnings.join(" | ")}`
+        : "";
+      setMessage(`Запущен мультисбор: ${response.result.targetsStarted} источника(ов).${warningText}`);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Realtime multi-platform sync start failed."
-      );
+      setError(err instanceof Error ? err.message : "Не удалось запустить мультисбор.");
     } finally {
       setBusy(false);
     }
   };
 
   if (loading) {
-    return <LoadingState label="Preparing upload and ingestion module..." />;
+    return <LoadingState label="Подготавливаю модуль загрузки..." />;
   }
 
   if (error && !hotels.length) {
-    return <ErrorState title="Upload module error" description={error} />;
+    return <ErrorState title="Ошибка модуля загрузки" description={error} />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Data Upload / Analysis Run"
-        subtitle="Create any Russian hotel profile, ingest review data, and run analytics with live processing states."
-        badge="Processing + Real Sources"
+        title="Загрузка данных"
+        subtitle="Создайте профиль отеля, выполните сбор отзывов и контролируйте статус обработки."
+        badge="Ingestion"
       />
 
       <Card className="anim-delay-1">
         <CardTitle
-          title="1) Add New Hotel (Any Russian Hotel)"
-          subtitle="Create a hotel profile before ingestion. This removes the limit of seed-only hotels."
+          title="1) Создать профиль отеля"
+          subtitle="Если отеля нет в системе, создайте его вручную."
         />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           <Input
-            placeholder="Hotel name"
+            placeholder="Название отеля"
             value={newHotel.name}
             onChange={(event) =>
               setNewHotel((prev) => ({ ...prev, name: event.target.value }))
             }
           />
           <Input
-            placeholder="City"
+            placeholder="Город"
             value={newHotel.city}
             onChange={(event) =>
               setNewHotel((prev) => ({ ...prev, city: event.target.value }))
             }
           />
           <Input
-            placeholder="Country"
+            placeholder="Страна"
             value={newHotel.country}
             onChange={(event) =>
               setNewHotel((prev) => ({ ...prev, country: event.target.value }))
             }
           />
           <Input
-            placeholder="Brand (optional)"
+            placeholder="Бренд (необязательно)"
             value={newHotel.brand}
             onChange={(event) =>
               setNewHotel((prev) => ({ ...prev, brand: event.target.value }))
             }
           />
           <Input
-            placeholder="Category (4*, 5*)"
+            placeholder="Категория (4*, 5*)"
             value={newHotel.category}
             onChange={(event) =>
               setNewHotel((prev) => ({ ...prev, category: event.target.value }))
             }
           />
           <Input
-            placeholder="Address (optional)"
+            placeholder="Адрес (необязательно)"
             value={newHotel.address}
             onChange={(event) =>
               setNewHotel((prev) => ({ ...prev, address: event.target.value }))
@@ -363,7 +354,7 @@ export function UploadPage() {
           />
           <Input
             className="md:col-span-2 xl:col-span-3"
-            placeholder="Description (optional)"
+            placeholder="Описание (необязательно)"
             value={newHotel.description}
             onChange={(event) =>
               setNewHotel((prev) => ({ ...prev, description: event.target.value }))
@@ -372,15 +363,15 @@ export function UploadPage() {
         </div>
         <div className="mt-3">
           <Button onClick={onCreateHotel} disabled={busy || !newHotel.name || !newHotel.city}>
-            Create Hotel Profile
+            Создать профиль
           </Button>
         </div>
       </Card>
 
       <Card className="anim-delay-2">
         <CardTitle
-          title="2) Platform Reviews Ingestion (Real Sources)"
-          subtitle="Run real source collection and analytics pipeline with live progress."
+          title="2) Сбор с площадок"
+          subtitle="Запуск по одному источнику или мультисбор по всем настроенным источникам."
         />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Select
@@ -396,26 +387,23 @@ export function UploadPage() {
 
           <Select
             value={platformProvider}
-            onChange={(event) =>
-              setPlatformProvider(event.target.value as PlatformProvider)
-            }
+            onChange={(event) => setPlatformProvider(event.target.value as PlatformProvider)}
           >
-            <option value="yandex_maps_dataset">Yandex Maps (reviews dataset)</option>
-            <option value="two_gis_dataset">2GIS / Flamp (reviews dataset)</option>
-            <option value="russian_travel_dataset">
-              Russian Aggregators Mix (Yandex/2GIS/Ostrovok/etc)
-            </option>
-            <option value="apify_dataset">Generic dataset connector (legacy)</option>
+            <option value="yandex_maps_dataset">Яндекс Карты</option>
+            <option value="two_gis_dataset">2ГИС / Flamp</option>
+            <option value="ostrovok_dataset">Островок</option>
+            <option value="russian_travel_dataset">Комбинированный набор площадок</option>
+            <option value="apify_dataset">Dataset connector</option>
           </Select>
 
           <Input
-            placeholder="Query label (hotel + city, optional)"
+            placeholder="Поисковая подпись (отель + город)"
             value={platformQuery}
             onChange={(event) => setPlatformQuery(event.target.value)}
           />
 
           <Input
-            placeholder="Max reviews"
+            placeholder="Максимум отзывов"
             value={platformLimit}
             onChange={(event) => setPlatformLimit(event.target.value)}
           />
@@ -428,23 +416,16 @@ export function UploadPage() {
           />
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button
-            onClick={onPlatformAnalyze}
-            disabled={busy || !selectedHotelId || !datasetUrl.trim()}
-          >
-            Fetch Platform Reviews + Analyze
+          <Button onClick={onPlatformAnalyze} disabled={busy || !selectedHotelId || !datasetUrl.trim()}>
+            Запустить сбор по выбранному источнику
           </Button>
-          <Button
-            variant="secondary"
-            onClick={onRealtimeAllPlatforms}
-            disabled={busy || !selectedHotelId}
-          >
-            Realtime Sync: All Configured Platforms
+          <Button variant="secondary" onClick={onRealtimeAllPlatforms} disabled={busy || !selectedHotelId}>
+            Запустить мультисбор по всем источникам
           </Button>
-          <Badge variant="info">Pipeline: fetch - normalize - dedupe - analyze</Badge>
+          <Badge variant="info">пайплайн: сбор → нормализация → дедупликация → анализ</Badge>
         </div>
         <p className="mt-2 text-xs text-textMuted">
-          Single-source run: fill provider + dataset URL. Multi-source realtime run: configure server targets and click the secondary button.
+          Для одиночного запуска укажите provider + dataset URL. Для мультисбора используются источники из серверной конфигурации.
         </p>
       </Card>
 
@@ -452,8 +433,8 @@ export function UploadPage() {
 
       <Card>
         <CardTitle
-          title="3) Manual Upload (CSV/JSON)"
-          subtitle="Alternative ingestion path for exports from OTA/PMS/CRM."
+          title="3) Ручной импорт CSV/JSON"
+          subtitle="Альтернативный путь для выгрузок из PMS/CRM/OTA."
         />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Select
@@ -475,9 +456,7 @@ export function UploadPage() {
           </Select>
           <Select
             value={sourceType}
-            onChange={(event) =>
-              setSourceType(event.target.value as AnalysisRunSourceType)
-            }
+            onChange={(event) => setSourceType(event.target.value as AnalysisRunSourceType)}
           >
             <option value="csv">csv</option>
             <option value="json">json</option>
@@ -486,10 +465,10 @@ export function UploadPage() {
           </Select>
           <div className="flex gap-2">
             <Button onClick={onPreview} disabled={busy}>
-              Preview
+              Предпросмотр
             </Button>
             <Button variant="secondary" onClick={onImport} disabled={busy}>
-              Import + Analyze
+              Импорт и анализ
             </Button>
           </div>
         </div>
@@ -503,23 +482,23 @@ export function UploadPage() {
       </Card>
 
       {message ? <Badge variant="success">{message}</Badge> : null}
-      {error ? <ErrorState title="Operation failed" description={error} /> : null}
+      {error ? <ErrorState title="Операция не выполнена" description={error} /> : null}
 
       {preview ? (
         <Card>
-          <CardTitle title="Validation Preview" subtitle="Review data quality before import." />
+          <CardTitle title="Предпросмотр качества данных" subtitle="Проверка перед импортом." />
           <div className="grid gap-3 md:grid-cols-4">
             <div className="rounded-lg border border-border bg-panelMuted p-3 text-sm">
-              Rows: {preview.totalRows}
+              Строк: {preview.totalRows}
             </div>
             <div className="rounded-lg border border-border bg-panelMuted p-3 text-sm">
-              Valid: {preview.validRows}
+              Валидных: {preview.validRows}
             </div>
             <div className="rounded-lg border border-border bg-panelMuted p-3 text-sm">
-              Duplicates: {preview.duplicates}
+              Дубликатов: {preview.duplicates}
             </div>
             <div className="rounded-lg border border-border bg-panelMuted p-3 text-sm">
-              Issues: {preview.issues.length}
+              Ошибок: {preview.issues.length}
             </div>
           </div>
           {preview.issues.length > 0 ? (
@@ -529,7 +508,7 @@ export function UploadPage() {
                   key={`${issue.row}-${issue.field}-${index}`}
                   className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-danger"
                 >
-                  Row {issue.row} / {issue.field}: {issue.message}
+                  Строка {issue.row} / {issue.field}: {issue.message}
                 </div>
               ))}
             </div>
@@ -538,11 +517,11 @@ export function UploadPage() {
       ) : null}
 
       <Card>
-        <CardTitle title="Analysis Runs" subtitle="History and current status of all runs." />
+        <CardTitle title="История запусков" subtitle="Все выполненные и активные задачи обработки." />
         {!runs.length ? (
           <EmptyState
-            title="No runs yet"
-            description="Start a platform ingestion or manual import to create first run."
+            title="Запусков пока нет"
+            description="Запустите сбор по площадкам или ручной импорт."
           />
         ) : (
           <div className="overflow-x-auto">
@@ -550,13 +529,13 @@ export function UploadPage() {
               <thead>
                 <tr className="border-b border-border text-xs uppercase tracking-[0.1em] text-textMuted">
                   <th className="px-2 py-3">Run ID</th>
-                  <th className="px-2 py-3">Source</th>
-                  <th className="px-2 py-3">Status</th>
-                  <th className="px-2 py-3">Stage</th>
-                  <th className="px-2 py-3">Progress</th>
-                  <th className="px-2 py-3">Fetched</th>
-                  <th className="px-2 py-3">Processed</th>
-                  <th className="px-2 py-3">Started</th>
+                  <th className="px-2 py-3">Источник</th>
+                  <th className="px-2 py-3">Статус</th>
+                  <th className="px-2 py-3">Этап</th>
+                  <th className="px-2 py-3">Готовность</th>
+                  <th className="px-2 py-3">Собрано</th>
+                  <th className="px-2 py-3">Обработано</th>
+                  <th className="px-2 py-3">Старт</th>
                 </tr>
               </thead>
               <tbody>
@@ -578,10 +557,10 @@ export function UploadPage() {
                             : "warning"
                         }
                       >
-                        {run.status}
+                        {translateRunStatus(run.status)}
                       </Badge>
                     </td>
-                    <td className="px-2 py-3">{run.stage || "-"}</td>
+                    <td className="px-2 py-3">{translateRunStage(run.stage)}</td>
                     <td className="px-2 py-3">{run.progressPct ?? 0}%</td>
                     <td className="px-2 py-3">{run.fetchedReviews ?? "-"}</td>
                     <td className="px-2 py-3">{run.totalReviewsProcessed}</td>
@@ -595,4 +574,33 @@ export function UploadPage() {
       </Card>
     </div>
   );
+}
+
+function translateRunStatus(status: AnalysisRun["status"]): string {
+  if (status === "completed") {
+    return "Завершено";
+  }
+  if (status === "failed") {
+    return "Ошибка";
+  }
+  if (status === "running") {
+    return "В работе";
+  }
+  return "Ожидание";
+}
+
+function translateRunStage(stage?: string): string {
+  if (!stage) {
+    return "-";
+  }
+  const map: Record<string, string> = {
+    fetching_reviews: "Сбор отзывов",
+    normalizing_reviews: "Нормализация",
+    deduping_reviews: "Дедупликация",
+    analyzing_reviews: "Анализ",
+    aggregating_insights: "Агрегация",
+    completed: "Готово",
+    failed: "Ошибка"
+  };
+  return map[stage] || stage;
 }

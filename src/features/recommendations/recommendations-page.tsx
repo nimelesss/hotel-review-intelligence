@@ -29,9 +29,12 @@ export function RecommendationsPage() {
         setHotels(response.items);
         if (response.items[0]) {
           setSelectedHotelId(response.items[0].id);
+        } else {
+          setLoading(false);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Ошибка загрузки отелей");
+        setError(err instanceof Error ? err.message : "Ошибка загрузки отелей.");
+        setLoading(false);
       }
     };
     void loadHotels();
@@ -50,7 +53,7 @@ export function RecommendationsPage() {
         );
         setPayload(response);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Ошибка загрузки рекомендаций");
+        setError(err instanceof Error ? err.message : "Ошибка загрузки рекомендаций.");
       } finally {
         setLoading(false);
       }
@@ -59,16 +62,16 @@ export function RecommendationsPage() {
   }, [selectedHotelId]);
 
   if (loading && !payload) {
-    return <LoadingState label="Готовлю рекомендации..." />;
+    return <LoadingState label="Формирую рекомендации..." />;
   }
   if (error && !payload) {
-    return <ErrorState title="Ошибка Recommendations" description={error} />;
+    return <ErrorState title="Ошибка рекомендаций" description={error} />;
   }
   if (!payload) {
     return (
       <ErrorState
-        title="Нет рекомендаций"
-        description="Не удалось получить рекомендации для выбранного отеля."
+        title="Рекомендации отсутствуют"
+        description="Не удалось получить рекомендации по выбранному отелю."
       />
     );
   }
@@ -76,8 +79,8 @@ export function RecommendationsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Recommendations"
-        subtitle="Rule-based actionable рекомендации с приоритетом и бизнес-обоснованием."
+        title="Рекомендации"
+        subtitle="Приоритизированные действия с прозрачным обоснованием."
         rightSlot={
           <Select
             value={selectedHotelId}
@@ -95,21 +98,14 @@ export function RecommendationsPage() {
       <div className="grid gap-4 xl:grid-cols-2">
         {payload.recommendations.map((recommendation) => (
           <Card key={recommendation.id}>
-            <CardTitle
-              title={recommendation.title}
-              subtitle={recommendation.description}
-            />
+            <CardTitle title={recommendation.title} subtitle={recommendation.description} />
             <div className="flex flex-wrap gap-2">
-              <Badge variant="info">{recommendation.category}</Badge>
+              <Badge variant="info">{translateCategory(recommendation.category)}</Badge>
               <Badge variant={priorityVariant(recommendation.priority)}>
-                {recommendation.priority}
+                {translatePriority(recommendation.priority)}
               </Badge>
-              <Badge variant="default">
-                Impact {recommendation.impactScore.toFixed(1)}
-              </Badge>
-              <Badge variant="default">
-                Effort {recommendation.effortScore.toFixed(1)}
-              </Badge>
+              <Badge variant="default">Эффект {recommendation.impactScore.toFixed(1)}</Badge>
+              <Badge variant="default">Трудоемкость {recommendation.effortScore.toFixed(1)}</Badge>
             </div>
             <p className="mt-3 text-sm text-textMuted">{recommendation.rationale}</p>
             <p className="mt-3 text-xs text-textMuted">
@@ -120,13 +116,30 @@ export function RecommendationsPage() {
             </p>
             <p className="mt-1 text-xs text-textMuted">
               Темы:{" "}
-              {recommendation.relatedTopics
-                .map((topic) => TOPIC_LABELS[topic])
-                .join(", ") || "-"}
+              {recommendation.relatedTopics.map((topic) => TOPIC_LABELS[topic]).join(", ") || "-"}
             </p>
           </Card>
         ))}
       </div>
     </div>
   );
+}
+
+function translateCategory(category: string): string {
+  const map: Record<string, string> = {
+    marketing: "Маркетинг",
+    operations: "Операции",
+    reputation: "Репутация",
+    strategy: "Стратегия"
+  };
+  return map[category] || category;
+}
+
+function translatePriority(priority: string): string {
+  const map: Record<string, string> = {
+    high: "Высокий",
+    medium: "Средний",
+    low: "Низкий"
+  };
+  return map[priority] || priority;
 }

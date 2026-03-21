@@ -31,9 +31,12 @@ export function SegmentAnalysisPage() {
         setHotels(response.items);
         if (response.items[0]) {
           setSelectedHotelId(response.items[0].id);
+        } else {
+          setLoading(false);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Ошибка загрузки отелей");
+        setError(err instanceof Error ? err.message : "Ошибка загрузки отелей.");
+        setLoading(false);
       }
     };
     void loadHotels();
@@ -52,7 +55,7 @@ export function SegmentAnalysisPage() {
         );
         setPayload(response);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Ошибка сегментного анализа");
+        setError(err instanceof Error ? err.message : "Ошибка сегментного анализа.");
       } finally {
         setLoading(false);
       }
@@ -61,16 +64,16 @@ export function SegmentAnalysisPage() {
   }, [selectedHotelId]);
 
   if (loading && !payload) {
-    return <LoadingState label="Готовлю сегментный анализ..." />;
+    return <LoadingState label="Формирую сегментный профиль..." />;
   }
   if (error && !payload) {
-    return <ErrorState title="Ошибка Segment Analysis" description={error} />;
+    return <ErrorState title="Ошибка сегментного анализа" description={error} />;
   }
   if (!payload) {
     return (
       <ErrorState
-        title="Нет сегментных данных"
-        description="Невозможно построить сегментный анализ."
+        title="Сегментные данные отсутствуют"
+        description="Не удалось сформировать сегментный срез."
       />
     );
   }
@@ -78,8 +81,8 @@ export function SegmentAnalysisPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Segment Analysis"
-        subtitle="Вероятностная сегментация и business meaning по каждому профилю гостей."
+        title="Сегменты"
+        subtitle="Вероятностная сегментация гостей и бизнес-смысл каждого сегмента."
         rightSlot={
           <Select
             value={selectedHotelId}
@@ -96,7 +99,7 @@ export function SegmentAnalysisPage() {
 
       <Card>
         <CardTitle
-          title="Segment Distribution"
+          title="Распределение сегментов"
           subtitle="Доли сегментов и относительная уверенность классификации."
         />
         <SegmentDistributionChart data={payload.segmentDistribution} />
@@ -104,8 +107,8 @@ export function SegmentAnalysisPage() {
 
       <Card>
         <CardTitle
-          title="Marker Method Notes"
-          subtitle="Прозрачные правила сегментации для бизнес-интерпретации."
+          title="Правила сегментации"
+          subtitle="Прозрачные методические принципы, применяемые в модели."
         />
         <ul className="space-y-2">
           {payload.markerNotes.map((note) => (
@@ -123,7 +126,7 @@ export function SegmentAnalysisPage() {
             <div className="flex flex-wrap gap-2">
               <Badge variant="info">Доля: {formatPercent(segment.share)}</Badge>
               <Badge variant={sentimentVariant(scoreToLabel(segment.averageSentiment))}>
-                Avg sentiment: {segment.averageSentiment.toFixed(2)}
+                Средняя тональность: {segment.averageSentiment.toFixed(2)}
               </Badge>
             </div>
             <p className="mt-3 text-xs font-semibold uppercase tracking-[0.1em] text-textMuted">

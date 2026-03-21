@@ -11,7 +11,7 @@ export function TopicDriverChart({
   tone: "positive" | "negative";
 }) {
   if (!data.length) {
-    return <p className="text-sm text-textMuted">Драйверы не обнаружены.</p>;
+    return <p className="text-sm text-textMuted">Драйверы пока не обнаружены.</p>;
   }
 
   return (
