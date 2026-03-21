@@ -29,6 +29,24 @@ interface RunsResponse {
   items: AnalysisRun[];
 }
 
+function presentRunSource(run: AnalysisRun): string {
+  const source = (run.provider || run.sourceType) as string;
+  switch (source) {
+    case "yandex_maps_dataset":
+      return "Yandex Maps";
+    case "two_gis_dataset":
+      return "2GIS / Flamp";
+    case "russian_travel_dataset":
+      return "Russian Aggregators Mix";
+    case "apify_dataset":
+      return "Dataset connector";
+    case "google_places":
+      return "Legacy provider (disabled)";
+    default:
+      return source;
+  }
+}
+
 const SAMPLE_CSV = `source,sourceReviewId,reviewDate,rating,title,text,language,authorName,stayTypeRaw
 booking.com,new-101,2026-03-10,8.6,Business trip,"Quick check-in, stable Wi-Fi, good desk for work.",ru,Ivan,Business
 yandex,new-102,2026-03-12,6.4,,\"Parking was overloaded and reception queue was slow.\",ru,Maria,Transit`;
@@ -493,7 +511,7 @@ export function UploadPage() {
                     onClick={() => setActiveRunId(run.id)}
                   >
                     <td className="px-2 py-3">{run.id}</td>
-                    <td className="px-2 py-3">{run.provider || run.sourceType}</td>
+                    <td className="px-2 py-3">{presentRunSource(run)}</td>
                     <td className="px-2 py-3">
                       <Badge
                         variant={
