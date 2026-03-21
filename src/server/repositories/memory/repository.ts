@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import {
   AnalysisRun,
   CreateHotelRequest,
@@ -28,9 +30,14 @@ interface MemoryState {
 
 export class InMemoryIntelligenceRepository implements IntelligenceRepository {
   private state: MemoryState;
+  private readonly storePath: string;
 
   constructor(seed?: Partial<MemoryState>) {
-    const baseState: MemoryState = {
+    this.storePath =
+      process.env.RUNTIME_STORE_PATH ||
+      path.join(process.cwd(), ".runtime-store.json");
+
+    const seededState: MemoryState = {
       hotels: seed?.hotels ?? seedHotels,
       reviews: seed?.reviews ?? seedReviews,
       analyses: seed?.analyses ?? [],
@@ -38,15 +45,20 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
       recommendations: seed?.recommendations ?? [],
       runs: seed?.runs ?? []
     };
-    this.state = baseState;
+
+    const loaded = this.loadFromDisk();
+    this.state = loaded ?? seededState;
     this.bootstrapAnalytics();
+    this.flushToDisk();
   }
 
   listHotels(): Hotel[] {
+    this.syncFromDisk();
     return [...this.state.hotels];
   }
 
   createHotel(request: CreateHotelRequest): Hotel {
+    this.syncFromDisk();
     const normalizedName = request.name.trim();
     const normalizedCity = request.city.trim();
     if (!normalizedName || !normalizedCity) {
@@ -82,18 +94,22 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
       updatedAt: now
     };
     this.state.hotels = [hotel, ...this.state.hotels];
+    this.flushToDisk();
     return hotel;
   }
 
   getHotelById(hotelId: string): Hotel | undefined {
+    this.syncFromDisk();
     return this.state.hotels.find((hotel) => hotel.id === hotelId);
   }
 
   listReviewsByHotel(hotelId: string): Review[] {
+    this.syncFromDisk();
     return this.state.reviews.filter((review) => review.hotelId === hotelId);
   }
 
   listAnalysesByHotel(hotelId: string): ReviewAnalysis[] {
+    this.syncFromDisk();
     const reviewIds = new Set(
       this.state.reviews
         .filter((review) => review.hotelId === hotelId)
@@ -103,22 +119,26 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
   }
 
   getAggregateByHotel(hotelId: string): HotelAggregate | undefined {
+    this.syncFromDisk();
     return this.state.aggregates.find((aggregate) => aggregate.hotelId === hotelId);
   }
 
   listRecommendationsByHotel(hotelId: string): Recommendation[] {
+    this.syncFromDisk();
     return this.state.recommendations.filter(
       (recommendation) => recommendation.hotelId === hotelId
     );
   }
 
   listRunsByHotel(hotelId: string): AnalysisRun[] {
+    this.syncFromDisk();
     return this.state.runs
       .filter((run) => run.hotelId === hotelId)
       .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   }
 
   queryReviews(query: ReviewsQuery): ReviewsQueryResult {
+    this.syncFromDisk();
     const reviews = this.listReviewsByHotel(query.hotelId);
     const analyses = this.listAnalysesByHotel(query.hotelId);
     const analysisMap = new Map(analyses.map((analysis) => [analysis.reviewId, analysis]));
@@ -138,10 +158,13 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
   }
 
   createRun(run: AnalysisRun): void {
+    this.syncFromDisk();
     this.state.runs = [run, ...this.state.runs.filter((item) => item.id !== run.id)];
+    this.flushToDisk();
   }
 
   updateRun(runId: string, patch: Partial<AnalysisRun>): AnalysisRun | undefined {
+    this.syncFromDisk();
     const index = this.state.runs.findIndex((run) => run.id === runId);
     if (index === -1) {
       return undefined;
@@ -151,10 +174,12 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
       ...patch
     };
     this.state.runs[index] = updated;
+    this.flushToDisk();
     return updated;
   }
 
   getRunById(runId: string): AnalysisRun | undefined {
+    this.syncFromDisk();
     return this.state.runs.find((run) => run.id === runId);
   }
 
@@ -166,6 +191,7 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
     recommendations: Recommendation[],
     run: AnalysisRun
   ): void {
+    this.syncFromDisk();
     const preservedReviews = this.state.reviews.filter(
       (review) => review.hotelId !== hotelId
     );
@@ -185,9 +211,11 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
     this.state.aggregates = [...preservedAggregates, aggregate];
     this.state.recommendations = [...preservedRecommendations, ...recommendations];
     this.state.runs = [run, ...this.state.runs.filter((item) => item.id !== run.id)];
+    this.flushToDisk();
   }
 
   getSnapshot(): RepositorySnapshot {
+    this.syncFromDisk();
     return {
       hotels: this.listHotels(),
       reviews: [...this.state.reviews],
@@ -199,7 +227,7 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
   }
 
   private bootstrapAnalytics(): void {
-    if (this.state.analyses.length > 0) {
+    if (this.state.analyses.length > 0 || this.state.aggregates.length > 0) {
       return;
     }
     this.state.hotels.forEach((hotel) => {
@@ -210,6 +238,41 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
       this.state.recommendations.push(...outcome.recommendations);
       this.state.runs.push(outcome.run);
     });
+  }
+
+  private syncFromDisk(): void {
+    const loaded = this.loadFromDisk();
+    if (loaded) {
+      this.state = loaded;
+    }
+  }
+
+  private loadFromDisk(): MemoryState | null {
+    try {
+      if (!fs.existsSync(this.storePath)) {
+        return null;
+      }
+      const raw = fs.readFileSync(this.storePath, "utf8");
+      if (!raw.trim()) {
+        return null;
+      }
+      const parsed = JSON.parse(raw) as MemoryState;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  private flushToDisk(): void {
+    try {
+      const directory = path.dirname(this.storePath);
+      if (!fs.existsSync(directory)) {
+        fs.mkdirSync(directory, { recursive: true });
+      }
+      fs.writeFileSync(this.storePath, JSON.stringify(this.state), "utf8");
+    } catch {
+      // Non-blocking: in-memory state remains usable even if file flush fails.
+    }
   }
 }
 
@@ -271,4 +334,3 @@ function applyReviewFilters(
   }
   return true;
 }
-
