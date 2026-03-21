@@ -28,8 +28,16 @@ interface MemoryState {
   runs: AnalysisRun[];
 }
 
-const LEGACY_DEMO_HOTEL_IDS = new Set(["hotel-riverpark-kazan", "hotel-test-deploy"]);
-const LEGACY_DEMO_HOTEL_NAMES = new Set(["Riverpark Hotel Kazan", "Test Deploy Hotel"]);
+const LEGACY_DEMO_HOTEL_IDS = new Set([
+  "hotel-courtyard-rostov",
+  "hotel-riverpark-kazan",
+  "hotel-test-deploy"
+]);
+const LEGACY_DEMO_HOTEL_NAMES = new Set([
+  "Courtyard by Marriott Rostov-on-Don",
+  "Riverpark Hotel Kazan",
+  "Test Deploy Hotel"
+]);
 
 export class InMemoryIntelligenceRepository implements IntelligenceRepository {
   private state: MemoryState;
@@ -97,10 +105,10 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
         .slice(-5)}`,
       name: normalizedName,
       city: normalizedCity,
-      country: (request.country || "Russia").trim(),
-      brand: (request.brand || "Independent").trim(),
+      country: (request.country || "Россия").trim(),
+      brand: (request.brand || "Независимый отель").trim(),
       category: (request.category || "4*").trim(),
-      address: (request.address || `${normalizedCity}, ${request.country || "Russia"}`).trim(),
+      address: (request.address || `${normalizedCity}, ${request.country || "Россия"}`).trim(),
       description:
         (request.description ||
           "Профиль создан пользователем. Аналитика появится после загрузки отзывов.").trim(),
@@ -260,21 +268,28 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
     const loaded = this.loadFromDisk();
     if (loaded) {
       this.state = loaded;
+      const changed = this.removeLegacyDemoHotels();
+      if (changed) {
+        this.flushToDisk();
+      }
     }
   }
 
-  private removeLegacyDemoHotels(): void {
+  private removeLegacyDemoHotels(): boolean {
+    let changed = false;
     const removableHotelIds = new Set(
       this.state.hotels
         .filter(
           (hotel) =>
-            LEGACY_DEMO_HOTEL_IDS.has(hotel.id) || LEGACY_DEMO_HOTEL_NAMES.has(hotel.name)
+            LEGACY_DEMO_HOTEL_IDS.has(hotel.id) ||
+            LEGACY_DEMO_HOTEL_NAMES.has(hotel.name) ||
+            LEGACY_DEMO_HOTEL_NAMES.has(hotel.name.trim())
         )
         .map((hotel) => hotel.id)
     );
 
     if (!removableHotelIds.size) {
-      return;
+      return false;
     }
 
     const removableReviewIds = new Set(
@@ -283,6 +298,7 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
         .map((review) => review.id)
     );
 
+    changed = true;
     this.state.hotels = this.state.hotels.filter((hotel) => !removableHotelIds.has(hotel.id));
     this.state.reviews = this.state.reviews.filter(
       (review) => !removableHotelIds.has(review.hotelId)
@@ -297,6 +313,8 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
       (item) => !removableHotelIds.has(item.hotelId)
     );
     this.state.runs = this.state.runs.filter((run) => !removableHotelIds.has(run.hotelId));
+
+    return changed;
   }
 
   private loadFromDisk(): MemoryState | null {
