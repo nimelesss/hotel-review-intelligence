@@ -22,7 +22,9 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         message:
-          error instanceof Error ? error.message : "Failed to read portfolio sync readiness."
+          error instanceof Error
+            ? error.message
+            : "Не удалось получить готовность портфельной синхронизации."
       },
       { status: 400 }
     );
@@ -48,7 +50,9 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         message:
-          error instanceof Error ? error.message : "Failed to start portfolio sync."
+          error instanceof Error
+            ? error.message
+            : "Не удалось запустить портфельную синхронизацию."
       },
       { status: 400 }
     );
@@ -61,7 +65,7 @@ function requireSyncToken(request: Request): NextResponse | null {
     return NextResponse.json(
       {
         message:
-          "SYNC_TRIGGER_TOKEN is not configured on server. Set it before using portfolio sync endpoint."
+          "SYNC_TRIGGER_TOKEN не настроен на сервере. Укажите его перед запуском портфельной синхронизации."
       },
       { status: 500 }
     );
@@ -73,7 +77,7 @@ function requireSyncToken(request: Request): NextResponse | null {
     : "";
 
   if (!actualToken || actualToken !== expectedToken) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ message: "Недостаточно прав доступа." }, { status: 401 });
   }
 
   return null;

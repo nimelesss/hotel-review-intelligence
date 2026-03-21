@@ -62,7 +62,17 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
     const normalizedName = request.name.trim();
     const normalizedCity = request.city.trim();
     if (!normalizedName || !normalizedCity) {
-      throw new Error("Hotel name and city are required.");
+      throw new Error("Название отеля и город обязательны.");
+    }
+
+    const normalizedExternalId = request.externalId?.trim();
+    if (normalizedExternalId) {
+      const byExternalId = this.state.hotels.find(
+        (hotel) => hotel.externalId === normalizedExternalId
+      );
+      if (byExternalId) {
+        return byExternalId;
+      }
     }
 
     const duplicate = this.state.hotels.find(
@@ -89,7 +99,9 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
       address: (request.address || `${normalizedCity}, ${request.country || "Russia"}`).trim(),
       description:
         (request.description ||
-          "Hotel profile created by user. Analytics will be generated after data ingestion.").trim(),
+          "Профиль создан пользователем. Аналитика появится после загрузки отзывов.").trim(),
+      coordinates: request.coordinates,
+      externalId: normalizedExternalId,
       createdAt: now,
       updatedAt: now
     };

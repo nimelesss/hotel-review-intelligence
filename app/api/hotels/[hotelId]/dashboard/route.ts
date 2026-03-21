@@ -9,7 +9,7 @@ export async function GET(_: Request, context: any) {
     return NextResponse.json(payload);
   } catch (error) {
     return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Dashboard error" },
+      { message: error instanceof Error ? error.message : "Ошибка формирования сводки." },
       { status: 400 }
     );
   }

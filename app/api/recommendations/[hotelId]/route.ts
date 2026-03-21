@@ -11,7 +11,7 @@ export async function GET(_: Request, context: any) {
     return NextResponse.json(
       {
         message:
-          error instanceof Error ? error.message : "Recommendations payload error"
+          error instanceof Error ? error.message : "Ошибка формирования рекомендаций."
       },
       { status: 400 }
     );

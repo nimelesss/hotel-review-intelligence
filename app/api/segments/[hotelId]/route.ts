@@ -9,7 +9,7 @@ export async function GET(_: Request, context: any) {
     return NextResponse.json(payload);
   } catch (error) {
     return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Segment analytics error" },
+      { message: error instanceof Error ? error.message : "Ошибка сегментной аналитики." },
       { status: 400 }
     );
   }

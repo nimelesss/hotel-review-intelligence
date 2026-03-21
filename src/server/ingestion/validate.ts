@@ -37,7 +37,7 @@ export function validateRows(rows: IngestionRawRow[]): ValidationResult {
       rowIssues.push({
         row: rowNo,
         field: "text",
-        message: "Review text is required and must be at least 5 characters."
+        message: "Текст отзыва обязателен и должен содержать минимум 5 символов."
       });
     }
 
@@ -46,7 +46,7 @@ export function validateRows(rows: IngestionRawRow[]): ValidationResult {
       rowIssues.push({
         row: rowNo,
         field: "rating",
-        message: "Rating is required and must be in range 0..10."
+        message: "Оценка обязательна и должна быть в диапазоне 0..10."
       });
     }
 
@@ -54,7 +54,7 @@ export function validateRows(rows: IngestionRawRow[]): ValidationResult {
       rowIssues.push({
         row: rowNo,
         field: "source",
-        message: "Source is not supported by ingestion schema."
+        message: "Источник не поддерживается текущей схемой загрузки."
       });
     }
 
@@ -62,7 +62,7 @@ export function validateRows(rows: IngestionRawRow[]): ValidationResult {
       rowIssues.push({
         row: rowNo,
         field: "reviewDate",
-        message: "Invalid reviewDate format."
+        message: "Некорректный формат reviewDate."
       });
     }
 

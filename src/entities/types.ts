@@ -49,6 +49,7 @@ export interface Hotel {
   address: string;
   coordinates?: Coordinates;
   description: string;
+  externalId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -193,11 +194,7 @@ export interface Recommendation {
   updatedAt: string;
 }
 
-export type AnalysisRunStatus =
-  | "pending"
-  | "running"
-  | "completed"
-  | "failed";
+export type AnalysisRunStatus = "pending" | "running" | "completed" | "failed";
 
 export type AnalysisRunSourceType =
   | "csv"
@@ -208,6 +205,7 @@ export type AnalysisRunSourceType =
 export type PlatformProvider =
   | "yandex_maps_dataset"
   | "two_gis_dataset"
+  | "ostrovok_dataset"
   | "russian_travel_dataset"
   | "apify_dataset";
 
@@ -238,6 +236,22 @@ export interface ExecutiveSummary {
   keyOpportunity: string;
 }
 
+export interface SourceCoverageItem {
+  source: ReviewSource;
+  label: string;
+  reviews: number;
+  share: number;
+  averageRating: number;
+  averageSentiment: number;
+  lastReviewDate?: string;
+}
+
+export interface DashboardDataHealth {
+  lastReviewDate?: string;
+  trackedSources: number;
+  reviewCoverageSummary: string;
+}
+
 export interface DashboardPayload {
   hotel: Hotel;
   aggregate: HotelAggregate;
@@ -246,6 +260,8 @@ export interface DashboardPayload {
     review: Review;
     analysis: ReviewAnalysis;
   }>;
+  sourceCoverage: SourceCoverageItem[];
+  dataHealth: DashboardDataHealth;
   latestRun?: AnalysisRun;
   executiveSummary: ExecutiveSummary;
 }
@@ -325,6 +341,18 @@ export interface CreateHotelRequest {
   category?: string;
   address?: string;
   description?: string;
+  coordinates?: Coordinates;
+  externalId?: string;
+}
+
+export interface HotelSearchResult {
+  externalId: string;
+  name: string;
+  city: string;
+  country: string;
+  address: string;
+  coordinates?: Coordinates;
+  source: "osm_nominatim";
 }
 
 export interface PlatformIngestionRequest {

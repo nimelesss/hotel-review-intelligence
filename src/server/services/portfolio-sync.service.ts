@@ -4,9 +4,7 @@ import {
   PlatformProvider
 } from "@/entities/types";
 import { getRepository } from "@/server/repositories";
-import {
-  startPlatformIngestionRun
-} from "@/server/services/intelligence.service";
+import { startPlatformIngestionRun } from "@/server/services/intelligence.service";
 
 type SyncMode = "manual" | "weekly";
 
@@ -24,6 +22,24 @@ interface RawPortfolioTarget {
 interface PortfolioTarget {
   hotelId?: string;
   hotelName?: string;
+  provider: PlatformProvider;
+  datasetUrl: string;
+  query?: string;
+  language: string;
+  limit?: number;
+  enabled: boolean;
+}
+
+interface RawFallbackTarget {
+  provider?: string;
+  datasetUrl?: string;
+  query?: string;
+  language?: string;
+  limit?: number;
+  enabled?: boolean;
+}
+
+interface FallbackTarget {
   provider: PlatformProvider;
   datasetUrl: string;
   query?: string;
@@ -53,6 +69,7 @@ export interface PortfolioSyncReadiness {
 const PROVIDERS = new Set<PlatformProvider>([
   "yandex_maps_dataset",
   "two_gis_dataset",
+  "ostrovok_dataset",
   "russian_travel_dataset",
   "apify_dataset"
 ]);
@@ -95,7 +112,7 @@ export function startPortfolioSync(mode: SyncMode, hotelIds?: string[]): Portfol
   const targets = readPortfolioTargets();
   if (!targets.length) {
     throw new Error(
-      "PORTFOLIO_SYNC_TARGETS_JSON is empty. Configure sync targets before running portfolio sync."
+      "Переменная PORTFOLIO_SYNC_TARGETS_JSON пуста. Настройте источники синхронизации."
     );
   }
 
@@ -107,9 +124,11 @@ export function startPortfolioSync(mode: SyncMode, hotelIds?: string[]): Portfol
         })
       )
     : null;
+
   if (hotelIds?.length && filterSet && filterSet.size === 0) {
-    throw new Error("None of provided hotelIds exist in system.");
+    throw new Error("Список hotelIds не содержит валидных отелей.");
   }
+
   const warnings: string[] = [];
   const runs: AnalysisRun[] = [];
   const coveredHotels = new Set<string>();
@@ -122,7 +141,7 @@ export function startPortfolioSync(mode: SyncMode, hotelIds?: string[]): Portfol
     const hotelId = resolveTargetHotelId(target);
     if (!hotelId) {
       warnings.push(
-        `Target skipped: cannot resolve hotel "${target.hotelId || target.hotelName || "unknown"}".`
+        `Источник пропущен: не удалось сопоставить отель (${target.hotelId || target.hotelName || "unknown"}).`
       );
       return;
     }
@@ -144,8 +163,8 @@ export function startPortfolioSync(mode: SyncMode, hotelIds?: string[]): Portfol
       coveredHotels.add(hotelId);
     } catch (error) {
       warnings.push(
-        `Target failed for hotel "${target.hotelId || target.hotelName || hotelId}": ${
-          error instanceof Error ? error.message : "unknown error"
+        `Источник для отеля "${target.hotelId || target.hotelName || hotelId}" завершился ошибкой: ${
+          error instanceof Error ? error.message : "неизвестная ошибка"
         }`
       );
     }
@@ -172,8 +191,9 @@ export function startPortfolioSync(mode: SyncMode, hotelIds?: string[]): Portfol
 export function startRealtimeSyncForHotel(hotelIdRaw: string): PortfolioSyncResult {
   const repository = getRepository();
   const hotelId = hotelIdRaw.trim();
-  if (!hotelId || !repository.getHotelById(hotelId)) {
-    throw new Error("hotelId is invalid or does not exist.");
+  const hotel = hotelId ? repository.getHotelById(hotelId) : undefined;
+  if (!hotel) {
+    throw new Error("hotelId не найден.");
   }
 
   const targets = readPortfolioTargets().filter((target) => target.enabled);
@@ -181,13 +201,63 @@ export function startRealtimeSyncForHotel(hotelIdRaw: string): PortfolioSyncResu
     (target) => resolveTargetHotelId(target) === hotelId
   );
 
-  if (!matchingHotelTargets.length) {
+  if (matchingHotelTargets.length > 0) {
+    return startPortfolioSync("manual", [hotelId]);
+  }
+
+  return startRealtimeSyncWithFallback(hotelId);
+}
+
+function startRealtimeSyncWithFallback(hotelId: string): PortfolioSyncResult {
+  const repository = getRepository();
+  const hotel = repository.getHotelById(hotelId);
+  if (!hotel) {
+    throw new Error("Отель не найден.");
+  }
+
+  const fallbackTargets = readFallbackTargets();
+  if (!fallbackTargets.length) {
     throw new Error(
-      "No configured sources for this hotel. Add target records in PORTFOLIO_SYNC_TARGETS_JSON."
+      "Для этого отеля нет персональных источников. Добавьте PORTFOLIO_SYNC_TARGETS_JSON или DEFAULT_REALTIME_TARGETS_JSON."
     );
   }
 
-  return startPortfolioSync("manual", [hotelId]);
+  const warnings: string[] = [];
+  const runs: AnalysisRun[] = [];
+  const baseQuery = `${hotel.name} ${hotel.city}`.trim();
+
+  fallbackTargets.forEach((target) => {
+    if (!target.enabled) {
+      return;
+    }
+    try {
+      const run = startPlatformIngestionRun({
+        hotelId,
+        provider: target.provider,
+        datasetUrl: target.datasetUrl,
+        query: target.query || baseQuery,
+        language: target.language,
+        limit: target.limit
+      });
+      runs.push(run);
+    } catch (error) {
+      warnings.push(
+        `Источник ${target.provider} завершился ошибкой: ${
+          error instanceof Error ? error.message : "неизвестная ошибка"
+        }`
+      );
+    }
+  });
+
+  return {
+    mode: "manual",
+    startedAt: new Date().toISOString(),
+    targetsTotal: fallbackTargets.filter((target) => target.enabled).length,
+    targetsStarted: runs.length,
+    hotelsCovered: runs.length > 0 ? 1 : 0,
+    runs,
+    warnings
+  };
 }
 
 function readPortfolioTargets(): PortfolioTarget[] {
@@ -200,10 +270,10 @@ function readPortfolioTargets(): PortfolioTarget[] {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error("PORTFOLIO_SYNC_TARGETS_JSON has invalid JSON format.");
+    throw new Error("PORTFOLIO_SYNC_TARGETS_JSON содержит некорректный JSON.");
   }
   if (!Array.isArray(parsed)) {
-    throw new Error("PORTFOLIO_SYNC_TARGETS_JSON must be a JSON array.");
+    throw new Error("PORTFOLIO_SYNC_TARGETS_JSON должен быть массивом JSON-объектов.");
   }
 
   const normalized: PortfolioTarget[] = [];
@@ -211,20 +281,61 @@ function readPortfolioTargets(): PortfolioTarget[] {
     const candidate = normalizeRawTarget(item);
     const provider = normalizeProvider(candidate.provider);
     if (!provider) {
-      throw new Error(`Sync target #${index + 1}: provider is missing or unsupported.`);
+      throw new Error(`Источник #${index + 1}: неизвестный provider.`);
     }
     if (!candidate.datasetUrl || !candidate.datasetUrl.startsWith("http")) {
-      throw new Error(`Sync target #${index + 1}: datasetUrl must be an absolute http(s) URL.`);
+      throw new Error(`Источник #${index + 1}: datasetUrl должен быть абсолютным URL.`);
     }
     if (!candidate.hotelId && !candidate.hotelName) {
       throw new Error(
-        `Sync target #${index + 1}: provide hotelId or hotelName to map target to hotel.`
+        `Источник #${index + 1}: укажите hotelId или hotelName для сопоставления.`
       );
     }
 
     normalized.push({
       hotelId: normalizeOptional(candidate.hotelId),
       hotelName: normalizeOptional(candidate.hotelName),
+      provider,
+      datasetUrl: candidate.datasetUrl.trim(),
+      query: normalizeOptional(candidate.query),
+      language: normalizeOptional(candidate.language) || "ru",
+      limit: normalizeLimit(candidate.limit),
+      enabled: candidate.enabled !== false
+    });
+  });
+
+  return normalized;
+}
+
+function readFallbackTargets(): FallbackTarget[] {
+  const raw = process.env.DEFAULT_REALTIME_TARGETS_JSON?.trim();
+  if (!raw) {
+    return [];
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("DEFAULT_REALTIME_TARGETS_JSON содержит некорректный JSON.");
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error("DEFAULT_REALTIME_TARGETS_JSON должен быть массивом JSON-объектов.");
+  }
+
+  const normalized: FallbackTarget[] = [];
+  parsed.forEach((item, index) => {
+    const candidate = normalizeFallbackTarget(item);
+    const provider = normalizeProvider(candidate.provider);
+    if (!provider) {
+      throw new Error(`Fallback источник #${index + 1}: неизвестный provider.`);
+    }
+    if (!candidate.datasetUrl || !candidate.datasetUrl.startsWith("http")) {
+      throw new Error(
+        `Fallback источник #${index + 1}: datasetUrl должен быть абсолютным URL.`
+      );
+    }
+    normalized.push({
       provider,
       datasetUrl: candidate.datasetUrl.trim(),
       query: normalizeOptional(candidate.query),
@@ -260,6 +371,13 @@ function normalizeRawTarget(item: unknown): RawPortfolioTarget {
     return {};
   }
   return item as RawPortfolioTarget;
+}
+
+function normalizeFallbackTarget(item: unknown): RawFallbackTarget {
+  if (!item || typeof item !== "object") {
+    return {};
+  }
+  return item as RawFallbackTarget;
 }
 
 function normalizeOptional(value?: string): string | undefined {

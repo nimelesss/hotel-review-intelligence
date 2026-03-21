@@ -1,16 +1,21 @@
 import {
   AnalysisRun,
   CreateHotelRequest,
+  DashboardDataHealth,
   DashboardPayload,
   ExecutiveSummary,
   IngestionImportRequest,
   IngestionPreviewResult,
   PlatformIngestionRequest,
   RecommendationPayload,
+  Review,
+  ReviewSource,
   SegmentAnalyticsPayload,
-  SentimentLabel
+  SentimentLabel,
+  SourceCoverageItem
 } from "@/entities/types";
 import { ANALYSIS_VERSION, DEFAULT_HOTEL_ID } from "@/shared/config/constants";
+import { REVIEW_SOURCE_LABELS, REVIEW_SOURCE_PRIORITY } from "@/shared/config/sources";
 import { SEGMENT_LABELS } from "@/shared/config/taxonomy";
 import { buildIngestionPreview, normalizeForImport } from "@/server/ingestion/pipeline";
 import { normalizeRows } from "@/server/ingestion/normalize";
@@ -36,24 +41,28 @@ export function getDashboardPayload(hotelIdRaw?: string): DashboardPayload {
   const hotelId = resolveHotelId(hotelIdRaw);
   const hotel = repository.getHotelById(hotelId);
   if (!hotel) {
-    throw new Error("Hotel not found");
+    throw new Error("Отель не найден.");
   }
+
   const aggregate = ensureHotelAnalytics(hotelId);
   if (!aggregate) {
-    throw new Error("Aggregate not found");
+    throw new Error("Агрегированная аналитика по отелю недоступна.");
   }
-  const recommendationsPreview = repository
-    .listRecommendationsByHotel(hotelId)
-    .slice(0, 5);
+
+  const recommendationsPreview = repository.listRecommendationsByHotel(hotelId).slice(0, 5);
   const reviewsResult = repository.queryReviews({ hotelId });
   const sampleExplainedReviews = reviewsResult.items.slice(0, 5);
   const latestRun = repository.listRunsByHotel(hotelId)[0];
+  const sourceCoverage = buildSourceCoverage(hotelId);
+  const dataHealth = buildDashboardDataHealth(sourceCoverage);
 
   return {
     hotel,
     aggregate,
     recommendationsPreview,
     sampleExplainedReviews,
+    sourceCoverage,
+    dataHealth,
     latestRun,
     executiveSummary: buildExecutiveSummary(aggregate)
   };
@@ -65,7 +74,7 @@ export function getSegmentPayload(hotelIdRaw?: string): SegmentAnalyticsPayload 
   const hotel = repository.getHotelById(hotelId);
   const aggregate = ensureHotelAnalytics(hotelId);
   if (!hotel || !aggregate) {
-    throw new Error("Segment data not found");
+    throw new Error("Сегментные данные не найдены.");
   }
 
   return {
@@ -73,21 +82,19 @@ export function getSegmentPayload(hotelIdRaw?: string): SegmentAnalyticsPayload 
     segmentDistribution: aggregate.segmentDistribution,
     segmentInsights: aggregate.segmentInsights,
     markerNotes: [
-      "Segmentation is probabilistic: one review can score across multiple segments.",
-      "Primary segment is assigned only when confidence is sufficient.",
-      "If top segment scores are too close, the review is marked as mixed."
+      "Сегментация вероятностная: один отзыв может содержать сигналы нескольких сегментов.",
+      "Основной сегмент присваивается только при достаточной уверенности.",
+      "Если разрыв между сегментами мал, отзыв получает признак «смешанный профиль»."
     ]
   };
 }
 
-export function getRecommendationPayload(
-  hotelIdRaw?: string
-): RecommendationPayload {
+export function getRecommendationPayload(hotelIdRaw?: string): RecommendationPayload {
   const repository = getRepository();
   const hotelId = resolveHotelId(hotelIdRaw);
   const hotel = repository.getHotelById(hotelId);
   if (!hotel) {
-    throw new Error("Hotel not found");
+    throw new Error("Отель не найден.");
   }
   ensureHotelAnalytics(hotelId);
   const recommendations = repository.listRecommendationsByHotel(hotelId);
@@ -97,9 +104,7 @@ export function getRecommendationPayload(
   };
 }
 
-export function previewIngestion(
-  request: IngestionImportRequest
-): IngestionPreviewResult {
+export function previewIngestion(request: IngestionImportRequest): IngestionPreviewResult {
   const repository = getRepository();
   const hotelId = resolveHotelId(request.hotelId);
   const existingReviews = repository.listReviewsByHotel(hotelId);
@@ -158,7 +163,7 @@ export function startPlatformIngestionRun(request: PlatformIngestionRequest): An
   const hotelId = resolveHotelId(request.hotelId);
   const hotel = repository.getHotelById(hotelId);
   if (!hotel) {
-    throw new Error("Hotel not found");
+    throw new Error("Отель не найден.");
   }
 
   const runId = createId("run-platform");
@@ -172,14 +177,14 @@ export function startPlatformIngestionRun(request: PlatformIngestionRequest): An
     analysisVersion: ANALYSIS_VERSION,
     stage: "fetching_reviews",
     progressPct: 5,
-    notes: "Platform ingestion started.",
+    notes: "Запущен сбор отзывов по площадкам.",
     provider: request.provider,
     fetchedReviews: 0
   };
   repository.createRun(initialRun);
 
   void executePlatformIngestion(runId, request).catch(() => {
-    // errors are handled inside executePlatformIngestion
+    // Ошибки обрабатываются внутри executePlatformIngestion.
   });
 
   return initialRun;
@@ -201,7 +206,7 @@ async function executePlatformIngestion(
       stage: "failed",
       progressPct: 100,
       completedAt: new Date().toISOString(),
-      errorMessage: "Hotel not found for processing."
+      errorMessage: "Отель не найден в процессе обработки."
     });
     return;
   }
@@ -235,7 +240,7 @@ async function executePlatformIngestion(
       stage: "deduping_reviews",
       progressPct: 48,
       fetchedReviews: normalized.normalized.length,
-      notes: `${platformResult.notes.join(" ")} Duplicates skipped: ${normalized.duplicates}.`
+      notes: `${platformResult.notes.join(" ")} Дубликатов пропущено: ${normalized.duplicates}.`
     });
 
     repository.updateRun(runId, {
@@ -263,8 +268,8 @@ async function executePlatformIngestion(
       provider: request.provider,
       fetchedReviews: normalized.normalized.length,
       notes:
-        `${platformResult.notes.join(" ")} Duplicates skipped: ${normalized.duplicates}.` +
-        ` Total reviews in storage: ${mergedReviews.length}.`
+        `${platformResult.notes.join(" ")} Дубликатов пропущено: ${normalized.duplicates}.` +
+        ` Всего отзывов в хранилище: ${mergedReviews.length}.`
     };
 
     repository.upsertAnalytics(
@@ -281,7 +286,8 @@ async function executePlatformIngestion(
       stage: "failed",
       progressPct: 100,
       completedAt: new Date().toISOString(),
-      errorMessage: error instanceof Error ? error.message : "Platform run failed"
+      errorMessage:
+        error instanceof Error ? error.message : "Ошибка сбора по внешним площадкам."
     });
   }
 }
@@ -306,31 +312,110 @@ function ensureHotelAnalytics(hotelId: string) {
   return repository.getAggregateByHotel(hotelId);
 }
 
-function buildExecutiveSummary(
-  aggregate: DashboardPayload["aggregate"]
-): ExecutiveSummary {
+function buildExecutiveSummary(aggregate: DashboardPayload["aggregate"]): ExecutiveSummary {
   const overallSentimentLabel = toSentimentLabel(aggregate.overallSentiment);
   const keyInsight =
-    aggregate.positiveDrivers[0] &&
-    aggregate.segmentDistribution[0] &&
-    `Strong theme "${aggregate.positiveDrivers[0].label}" supports segment "${SEGMENT_LABELS[aggregate.segmentDistribution[0].id]}".`;
+    aggregate.positiveDrivers[0] && aggregate.segmentDistribution[0]
+      ? `Сильная тема "${aggregate.positiveDrivers[0].label}" поддерживает сегмент "${SEGMENT_LABELS[aggregate.segmentDistribution[0].id]}".`
+      : "Недостаточно данных для уверенного ключевого вывода.";
   const keyRisk =
     aggregate.keyRisks[0] ??
     (aggregate.negativeDrivers[0]
-      ? `Needs attention: ${aggregate.negativeDrivers[0].label}.`
-      : "No critical risk detected at current sample size.");
+      ? `Требует контроля: ${aggregate.negativeDrivers[0].label}.`
+      : "Критичных рисков на текущей выборке не выявлено.");
   const keyOpportunity =
     aggregate.growthOpportunities[0] ??
-    "Growth opportunity exists via stronger communication of proven strengths.";
+    "Потенциал роста: усилить в коммуникации подтвержденные сильные стороны.";
 
   return {
     averageRating: aggregate.averageRating,
     totalReviews: aggregate.totalReviews,
     overallSentimentLabel,
     dominantSegment: aggregate.dominantSegment,
-    keyInsight: keyInsight ?? "Not enough data for a strong executive conclusion.",
+    keyInsight,
     keyRisk,
     keyOpportunity
+  };
+}
+
+function buildSourceCoverage(hotelId: string): SourceCoverageItem[] {
+  const repository = getRepository();
+  const reviews = repository.listReviewsByHotel(hotelId);
+  const analyses = repository.listAnalysesByHotel(hotelId);
+  const analysisMap = new Map(analyses.map((analysis) => [analysis.reviewId, analysis]));
+
+  const grouped = new Map<
+    ReviewSource,
+    { reviews: Review[]; sentimentSum: number; sentimentCount: number }
+  >();
+
+  reviews.forEach((review) => {
+    const bucket = grouped.get(review.source) || {
+      reviews: [],
+      sentimentSum: 0,
+      sentimentCount: 0
+    };
+    bucket.reviews.push(review);
+    const analysis = analysisMap.get(review.id);
+    if (analysis) {
+      bucket.sentimentSum += analysis.sentimentScore;
+      bucket.sentimentCount += 1;
+    }
+    grouped.set(review.source, bucket);
+  });
+
+  const totalReviews = Math.max(reviews.length, 1);
+  const items: SourceCoverageItem[] = [];
+
+  grouped.forEach((bucket, source) => {
+    const sortedByDate = bucket.reviews
+      .map((review) => review.reviewDate)
+      .sort((a, b) => b.localeCompare(a));
+    const ratingSum = bucket.reviews.reduce((sum, review) => sum + review.rating, 0);
+    items.push({
+      source,
+      label: REVIEW_SOURCE_LABELS[source] || source,
+      reviews: bucket.reviews.length,
+      share: bucket.reviews.length / totalReviews,
+      averageRating: ratingSum / Math.max(bucket.reviews.length, 1),
+      averageSentiment:
+        bucket.sentimentSum / Math.max(bucket.sentimentCount, 1),
+      lastReviewDate: sortedByDate[0]
+    });
+  });
+
+  return items.sort((a, b) => {
+    const priorityA = REVIEW_SOURCE_PRIORITY.indexOf(a.source);
+    const priorityB = REVIEW_SOURCE_PRIORITY.indexOf(b.source);
+    if (priorityA !== -1 && priorityB !== -1 && priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+    return b.reviews - a.reviews;
+  });
+}
+
+function buildDashboardDataHealth(sourceCoverage: SourceCoverageItem[]): DashboardDataHealth {
+  const sortedByDate = sourceCoverage
+    .map((item) => item.lastReviewDate)
+    .filter((date): date is string => !!date)
+    .sort((a, b) => b.localeCompare(a));
+  const lastReviewDate = sortedByDate[0];
+
+  const trackedSources = sourceCoverage.length;
+  const coreSources = sourceCoverage.filter((item) =>
+    ["yandex", "2gis", "ostrovok"].includes(item.source)
+  );
+  const coreReviews = coreSources.reduce((sum, item) => sum + item.reviews, 0);
+
+  const reviewCoverageSummary =
+    coreSources.length > 0
+      ? `Основные площадки (Яндекс, 2ГИС, Островок): ${coreReviews} отзывов.`
+      : "Основные российские площадки пока не подключены или не содержат данных.";
+
+  return {
+    lastReviewDate,
+    trackedSources,
+    reviewCoverageSummary
   };
 }
 

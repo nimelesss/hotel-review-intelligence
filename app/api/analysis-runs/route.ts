@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as IngestionImportRequest;
     if (!body.payload || !body.fileType || !body.sourceType) {
       return NextResponse.json(
-        { message: "payload, fileType and sourceType are required." },
+        { message: "Поля payload, fileType и sourceType обязательны." },
         { status: 400 }
       );
     }
@@ -31,7 +31,10 @@ export async function POST(request: Request) {
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Import run failed" },
+      {
+        message:
+          error instanceof Error ? error.message : "Не удалось выполнить импорт и анализ."
+      },
       { status: 400 }
     );
   }

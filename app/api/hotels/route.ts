@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as CreateHotelRequest;
     if (!body.name || !body.city) {
       return NextResponse.json(
-        { message: "name and city are required." },
+        { message: "Поля name и city обязательны." },
         { status: 400 }
       );
     }
@@ -23,7 +23,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ item: hotel }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Create hotel failed." },
+      {
+        message:
+          error instanceof Error
+            ? error.message
+            : "Не удалось создать профиль отеля."
+      },
       { status: 400 }
     );
   }

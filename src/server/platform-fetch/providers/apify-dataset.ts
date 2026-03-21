@@ -20,6 +20,11 @@ const PROVIDER_PROFILES: Record<string, ProviderProfile> = {
     label: "2GIS / Flamp",
     fallbackSource: "2gis"
   },
+  ostrovok_dataset: {
+    provider: "ostrovok_dataset",
+    label: "Островок",
+    fallbackSource: "ostrovok"
+  },
   russian_travel_dataset: {
     provider: "russian_travel_dataset",
     label: "Russian travel aggregators",
@@ -50,6 +55,12 @@ export async function fetchFromRussianTravelDataset(
   return fetchFromDatasetByProfile(request, PROVIDER_PROFILES.russian_travel_dataset);
 }
 
+export async function fetchFromOstrovokDataset(
+  request: PlatformFetchRequest
+): Promise<PlatformFetchResult> {
+  return fetchFromDatasetByProfile(request, PROVIDER_PROFILES.ostrovok_dataset);
+}
+
 export async function fetchFromApifyDataset(
   request: PlatformFetchRequest
 ): Promise<PlatformFetchResult> {
@@ -63,11 +74,12 @@ async function fetchFromDatasetByProfile(
   const datasetUrl = request.datasetUrl?.trim() || request.apifyDatasetUrl?.trim();
   if (!datasetUrl) {
     throw new Error(
-      "datasetUrl is required. Pass URL of JSON review export (Yandex/2GIS/aggregator dataset)."
+      "datasetUrl обязателен. Передайте URL JSON-выгрузки отзывов."
     );
   }
 
   const limit = clampLimit(request.limit ?? 250, 10, 5000);
+  const searchNeedle = buildSearchNeedle(request);
   const rows: IngestionRawRow[] = [];
   let offset = 0;
 
@@ -81,7 +93,7 @@ async function fetchFromDatasetByProfile(
 
     const response = await fetch(url.toString(), { cache: "no-store" });
     if (!response.ok) {
-      throw new Error(`Dataset request failed: HTTP ${response.status}`);
+      throw new Error(`Ошибка запроса к dataset: HTTP ${response.status}`);
     }
 
     const payload = (await response.json()) as unknown;
@@ -101,7 +113,11 @@ async function fetchFromDatasetByProfile(
       )
       .filter((row): row is IngestionRawRow => !!row.text && row.text.length > 3);
 
-    rows.push(...mapped);
+    const filtered = searchNeedle
+      ? mapped.filter((row) => rowMatchesNeedle(row, searchNeedle))
+      : mapped;
+
+    rows.push(...filtered);
 
     if (items.length < pageSize) {
       break;
@@ -114,9 +130,29 @@ async function fetchFromDatasetByProfile(
     rows: rows.slice(0, limit),
     notes: [
       `${profile.label}: fetched ${rows.length} review rows from dataset export.`,
-      "Pipeline supports large imports with pagination, deduplication, and explainable analytics."
+      searchNeedle
+        ? `Применен фильтр по отелю: ${searchNeedle}.`
+        : "Данные загружены без дополнительного фильтра по названию отеля.",
+      "Включены пагинация, дедупликация и explainable-аналитика."
     ]
   };
+}
+
+function buildSearchNeedle(request: PlatformFetchRequest): string | null {
+  const raw = request.query?.trim() || `${request.hotel.name} ${request.hotel.city}`;
+  const normalized = raw.toLocaleLowerCase("ru-RU").trim();
+  return normalized.length >= 3 ? normalized : null;
+}
+
+function rowMatchesNeedle(row: IngestionRawRow, needle: string): boolean {
+  const haystack = `${row.title || ""} ${row.text || ""} ${row.stayTypeRaw || ""}`
+    .toLocaleLowerCase("ru-RU")
+    .trim();
+  if (!haystack) {
+    return false;
+  }
+  const chunks = needle.split(/\s+/).filter((chunk) => chunk.length >= 3);
+  return chunks.some((chunk) => haystack.includes(chunk));
 }
 
 function mapDatasetItem(

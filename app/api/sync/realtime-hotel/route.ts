@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as RealtimeHotelSyncRequestBody;
     if (!body.hotelId) {
-      return NextResponse.json({ message: "hotelId is required." }, { status: 400 });
+      return NextResponse.json({ message: "Поле hotelId обязательно." }, { status: 400 });
     }
 
     const result = startRealtimeSyncForHotel(body.hotelId);
@@ -18,7 +18,9 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         message:
-          error instanceof Error ? error.message : "Realtime sync for hotel failed."
+          error instanceof Error
+            ? error.message
+            : "Не удалось запустить синхронизацию по отелю."
       },
       { status: 400 }
     );

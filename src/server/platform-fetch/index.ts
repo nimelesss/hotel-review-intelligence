@@ -1,6 +1,7 @@
 import { PlatformFetchResult, PlatformFetchRequest } from "@/server/platform-fetch/types";
 import {
   fetchFromApifyDataset,
+  fetchFromOstrovokDataset,
   fetchFromRussianTravelDataset,
   fetchFromTwoGisDataset,
   fetchFromYandexMapsDataset
@@ -17,6 +18,9 @@ export async function fetchPlatformReviews(
   }
   if (request.provider === "russian_travel_dataset") {
     return fetchFromRussianTravelDataset(request);
+  }
+  if (request.provider === "ostrovok_dataset") {
+    return fetchFromOstrovokDataset(request);
   }
   if (request.provider === "apify_dataset") {
     return fetchFromApifyDataset(request);

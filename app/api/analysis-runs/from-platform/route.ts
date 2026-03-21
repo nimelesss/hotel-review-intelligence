@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as PlatformIngestionRequest;
     if (!body.provider || !body.hotelId) {
       return NextResponse.json(
-        { message: "provider and hotelId are required." },
+        { message: "Поля provider и hotelId обязательны." },
         { status: 400 }
       );
     }
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           message:
-            "datasetUrl is required for platform ingestion (Yandex/2GIS/aggregator export)."
+            "Для запуска укажите datasetUrl (или apifyDatasetUrl) с выгрузкой отзывов."
         },
         { status: 400 }
       );
@@ -33,7 +33,9 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         message:
-          error instanceof Error ? error.message : "Platform ingestion start failed."
+          error instanceof Error
+            ? error.message
+            : "Не удалось запустить сбор по площадке."
       },
       { status: 400 }
     );
