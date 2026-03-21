@@ -5,18 +5,18 @@ const now = new Date().toISOString();
 export const seedHotels: Hotel[] = [
   {
     id: "hotel-courtyard-rostov",
-    name: "Courtyard by Marriott Ростов-на-Дону",
+    name: "Courtyard by Marriott Rostov-on-Don",
     brand: "Courtyard by Marriott",
-    city: "Ростов-на-Дону",
-    country: "Россия",
+    city: "Rostov-on-Don",
+    country: "Russia",
     category: "4*",
-    address: "ул. Большая Садовая, 115, Ростов-на-Дону",
+    address: "Rostov-on-Don, Russia (exact address to be specified)",
     coordinates: {
       lat: 47.2221,
       lon: 39.7188
     },
     description:
-      "Бизнес-ориентированный городской отель с инфраструктурой для командировок и мероприятий.",
+      "Business-oriented city hotel with infrastructure for corporate trips and events.",
     createdAt: now,
     updatedAt: now
   },
@@ -24,16 +24,16 @@ export const seedHotels: Hotel[] = [
     id: "hotel-riverpark-kazan",
     name: "Riverpark Hotel Kazan",
     brand: "Riverpark",
-    city: "Казань",
-    country: "Россия",
+    city: "Kazan",
+    country: "Russia",
     category: "4*",
-    address: "Набережная, 21, Казань",
+    address: "Kazan, Russia (seed data sample)",
     coordinates: {
       lat: 55.7961,
       lon: 49.1064
     },
     description:
-      "Городской отель смешанного спроса: бизнес, семейные поездки и событийный трафик.",
+      "Urban mixed-demand hotel: business, family trips, and event-driven stays.",
     createdAt: now,
     updatedAt: now
   }
