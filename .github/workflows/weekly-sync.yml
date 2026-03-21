@@ -13,18 +13,35 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger weekly sync on VPS
+      - name: Trigger catalog + weekly review sync on VPS
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           script_stop: true
-          command_timeout: 15m
+          command_timeout: 45m
           script: |
             set -e
             if [ -z "${{ secrets.SYNC_TRIGGER_TOKEN }}" ]; then
               echo "SYNC_TRIGGER_TOKEN secret is missing in GitHub."
+              exit 1
+            fi
+
+            cd /srv/hotel-review-intelligence
+            if [ -f package.json ]; then
+              npm run catalog:refresh -- --output data/russia-hotels-catalog.json --maxTiles 220 --limit 150000 || true
+            fi
+
+            CATALOG_CODE=$(curl -sS -o /tmp/catalog-sync-response.json -w "%{http_code}" \
+              -X POST "http://127.0.0.1:3100/api/catalog/sync" \
+              -H "Authorization: Bearer ${{ secrets.SYNC_TRIGGER_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d '{"limit":80000}')
+
+            cat /tmp/catalog-sync-response.json
+            if [ "$CATALOG_CODE" -lt 200 ] || [ "$CATALOG_CODE" -gt 299 ]; then
+              echo "Catalog sync failed with HTTP $CATALOG_CODE"
               exit 1
             fi
 

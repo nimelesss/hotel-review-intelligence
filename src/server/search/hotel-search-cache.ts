@@ -1,24 +1,13 @@
-﻿import fs from "node:fs";
+import fs from "node:fs";
 import path from "node:path";
 import { HotelSearchResult } from "@/entities/types";
 import { seedHotelSearchCatalog } from "@/data/seeds/hotel-search-catalog";
+import { loadRussiaHotelsCatalog } from "@/server/catalog/catalog-loader";
+import { decodeEscapedUnicode, normalizeSearchText, normalizeWhitespace } from "@/shared/lib/text";
 
 interface CacheFilePayload {
   updatedAt: string;
   items: HotelSearchResult[];
-}
-
-interface ImportedCatalogItem {
-  id?: string | number;
-  externalId?: string;
-  name?: string;
-  city?: string;
-  country?: string;
-  address?: string;
-  lat?: number | string;
-  lon?: number | string;
-  latitude?: number | string;
-  longitude?: number | string;
 }
 
 const DEFAULT_CACHE_LIMIT = 50_000;
@@ -33,12 +22,7 @@ function getCachePath(): string {
 }
 
 function normalize(value: string): string {
-  return value
-    .toLocaleLowerCase("ru-RU")
-    .replace(/\u0451/g, "\u0435")
-    .replace(/[^\p{L}\p{N}\s-]+/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return normalizeSearchText(value);
 }
 
 function getCacheLimit(): number {
@@ -126,11 +110,15 @@ function readCacheFromDisk(): HotelSearchResult[] {
     if (!raw.trim()) {
       return [];
     }
+
     const parsed = JSON.parse(raw) as CacheFilePayload;
     if (!Array.isArray(parsed.items)) {
       return [];
     }
-    return parsed.items;
+
+    return parsed.items
+      .map((item) => sanitizeCatalogItem(item))
+      .filter((item): item is HotelSearchResult => !!item);
   } catch {
     return [];
   }
@@ -153,7 +141,11 @@ function writeCacheToDisk(items: HotelSearchResult[]): void {
 function mergeUnique(items: HotelSearchResult[]): HotelSearchResult[] {
   const map = new Map<string, HotelSearchResult>();
   for (const item of items) {
-    map.set(signature(item), item);
+    const sanitized = sanitizeCatalogItem(item);
+    if (!sanitized) {
+      continue;
+    }
+    map.set(signature(sanitized), sanitized);
   }
   return [...map.values()];
 }
@@ -182,60 +174,28 @@ function saveCache(items: HotelSearchResult[]): void {
   writeCacheToDisk(items);
 }
 
-function parseNumber(input: unknown): number | undefined {
-  const value = Number(input);
-  if (!Number.isFinite(value)) {
-    return undefined;
-  }
-  return value;
-}
-
-function toCatalogResult(item: ImportedCatalogItem): HotelSearchResult | null {
-  const name = (item.name || "").trim();
-  const city = (item.city || "").trim();
-  if (!name || !city) {
-    return null;
-  }
-
-  const externalId =
-    (item.externalId || "").toString().trim() ||
-    (item.id || "").toString().trim() ||
-    `import-${normalize(name)}-${normalize(city)}`;
-
-  const lat = parseNumber(item.lat ?? item.latitude);
-  const lon = parseNumber(item.lon ?? item.longitude);
-
-  return {
-    externalId,
-    name,
-    city,
-    country: (item.country || "Россия").trim(),
-    address: (item.address || `${name}, ${city}`).trim(),
-    coordinates: typeof lat === "number" && typeof lon === "number" ? { lat, lon } : undefined,
-    source: "catalog_import"
-  };
-}
-
 export async function hydrateHotelCatalogFromRemoteSource(): Promise<void> {
-  const remoteUrl = (process.env.RUSSIA_HOTELS_CATALOG_URL || "").trim();
-  if (!remoteUrl || remoteCatalogHydrated) {
+  if (remoteCatalogHydrated) {
     return;
   }
 
-  const response = await fetch(remoteUrl, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`Ошибка загрузки удаленного каталога отелей: HTTP ${response.status}`);
+  const hasSource =
+    !!process.env.RUSSIA_HOTELS_CATALOG_URL?.trim() ||
+    !!process.env.RUSSIA_HOTELS_CATALOG_PATH?.trim();
+
+  if (!hasSource) {
+    return;
   }
 
-  const payload = (await response.json()) as ImportedCatalogItem[];
-  if (!Array.isArray(payload)) {
-    throw new Error("Удаленный каталог отелей должен быть JSON-массивом.");
-  }
-
-  const imported = payload
-    .map(toCatalogResult)
-    .filter((item): item is HotelSearchResult => !!item)
-    .slice(0, getCacheLimit());
+  const loaded = await loadRussiaHotelsCatalog(getCacheLimit());
+  const imported = loaded.records
+    .map((item) =>
+      sanitizeCatalogItem({
+        ...item,
+        source: "catalog_import"
+      })
+    )
+    .filter((item): item is HotelSearchResult => !!item);
 
   if (imported.length) {
     upsertHotelCatalog(imported);
@@ -270,4 +230,33 @@ export function upsertHotelCatalog(items: HotelSearchResult[]): void {
   const existing = loadCache();
   const merged = mergeUnique([...items, ...existing]).slice(0, getCacheLimit());
   saveCache(merged);
+}
+
+function sanitizeCatalogItem(item: HotelSearchResult): HotelSearchResult | null {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+
+  const name = normalizeWhitespace(decodeEscapedUnicode(item.name || ""));
+  const city = normalizeWhitespace(decodeEscapedUnicode(item.city || ""));
+  if (!name || !city) {
+    return null;
+  }
+
+  const country = normalizeWhitespace(decodeEscapedUnicode(item.country || "Россия")) || "Россия";
+  const address =
+    normalizeWhitespace(decodeEscapedUnicode(item.address || `${name}, ${city}`)) || `${name}, ${city}`;
+
+  const externalIdRaw = normalizeWhitespace(decodeEscapedUnicode(item.externalId || ""));
+  const externalId = externalIdRaw || `cache-${normalize(name).replace(/\s+/g, "-")}-${normalize(city).replace(/\s+/g, "-")}`;
+
+  return {
+    externalId,
+    name,
+    city,
+    country,
+    address,
+    coordinates: item.coordinates,
+    source: item.source || "catalog_import"
+  };
 }

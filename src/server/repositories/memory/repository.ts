@@ -83,7 +83,12 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
         (hotel) => hotel.externalId === normalizedExternalId
       );
       if (byExternalId) {
-        return byExternalId;
+        const merged = mergeHotel(byExternalId, request);
+        this.state.hotels = this.state.hotels.map((hotel) =>
+          hotel.id === byExternalId.id ? merged : hotel
+        );
+        this.flushToDisk();
+        return merged;
       }
     }
 
@@ -95,7 +100,12 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
           normalizedCity.toLocaleLowerCase("ru-RU")
     );
     if (duplicate) {
-      return duplicate;
+      const merged = mergeHotel(duplicate, request);
+      this.state.hotels = this.state.hotels.map((hotel) =>
+        hotel.id === duplicate.id ? merged : hotel
+      );
+      this.flushToDisk();
+      return merged;
     }
 
     const now = new Date().toISOString();
@@ -352,6 +362,32 @@ function slugify(value: string): string {
     .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 30);
+}
+
+function mergeHotel(hotel: Hotel, request: CreateHotelRequest): Hotel {
+  const now = new Date().toISOString();
+
+  const nextCountry = (request.country || "").trim();
+  const nextBrand = (request.brand || "").trim();
+  const nextCategory = (request.category || "").trim();
+  const nextAddress = (request.address || "").trim();
+  const nextDescription = (request.description || "").trim();
+  const nextExternalId = request.externalId?.trim();
+  const nextCoordinates = request.coordinates;
+
+  const merged: Hotel = {
+    ...hotel,
+    country: nextCountry || hotel.country,
+    brand: nextBrand || hotel.brand,
+    category: nextCategory || hotel.category,
+    address: nextAddress || hotel.address,
+    description: nextDescription || hotel.description,
+    externalId: nextExternalId || hotel.externalId,
+    coordinates: nextCoordinates || hotel.coordinates,
+    updatedAt: now
+  };
+
+  return merged;
 }
 
 function applyReviewFilters(
