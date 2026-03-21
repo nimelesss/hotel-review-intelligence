@@ -6,13 +6,17 @@ import {
 
 const SOURCES: ReviewSource[] = [
   "booking.com",
-  "google",
-  "ostrovok",
-  "tripadvisor",
   "yandex",
+  "2gis",
+  "flamp",
+  "ostrovok",
+  "otzovik",
+  "yell",
+  "sutochno",
+  "bronevik",
+  "tripadvisor",
   "manual_upload",
   "mock_api",
-  "google_places",
   "apify_dataset"
 ];
 
@@ -33,7 +37,7 @@ export function validateRows(rows: IngestionRawRow[]): ValidationResult {
       rowIssues.push({
         row: rowNo,
         field: "text",
-        message: "Текст отзыва обязателен и должен быть длиннее 5 символов."
+        message: "Review text is required and must be at least 5 characters."
       });
     }
 
@@ -42,7 +46,7 @@ export function validateRows(rows: IngestionRawRow[]): ValidationResult {
       rowIssues.push({
         row: rowNo,
         field: "rating",
-        message: "Рейтинг обязателен и должен быть в диапазоне 0..10."
+        message: "Rating is required and must be in range 0..10."
       });
     }
 
@@ -50,7 +54,7 @@ export function validateRows(rows: IngestionRawRow[]): ValidationResult {
       rowIssues.push({
         row: rowNo,
         field: "source",
-        message: "Источник не поддерживается в MVP."
+        message: "Source is not supported by ingestion schema."
       });
     }
 
@@ -58,7 +62,7 @@ export function validateRows(rows: IngestionRawRow[]): ValidationResult {
       rowIssues.push({
         row: rowNo,
         field: "reviewDate",
-        message: "Неверный формат даты отзыва."
+        message: "Invalid reviewDate format."
       });
     }
 

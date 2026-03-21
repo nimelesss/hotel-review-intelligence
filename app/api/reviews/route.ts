@@ -89,13 +89,17 @@ function castSource(value: string | null): ReviewSource | undefined {
   }
   return [
     "booking.com",
-    "google",
-    "ostrovok",
-    "tripadvisor",
     "yandex",
+    "2gis",
+    "flamp",
+    "ostrovok",
+    "otzovik",
+    "yell",
+    "sutochno",
+    "bronevik",
+    "tripadvisor",
     "manual_upload",
     "mock_api",
-    "google_places",
     "apify_dataset"
   ].includes(value)
     ? (value as ReviewSource)

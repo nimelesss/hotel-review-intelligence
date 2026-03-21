@@ -24,12 +24,17 @@ interface HotelListResponse {
 }
 
 const SOURCES = [
-  "booking.com",
-  "google",
   "yandex",
+  "2gis",
+  "flamp",
   "ostrovok",
+  "otzovik",
+  "sutochno",
+  "bronevik",
+  "booking.com",
   "tripadvisor",
-  "manual_upload"
+  "manual_upload",
+  "mock_api"
 ];
 
 interface FiltersState {

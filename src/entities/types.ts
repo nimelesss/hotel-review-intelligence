@@ -56,12 +56,16 @@ export interface Hotel {
 export type ReviewSource =
   | "booking.com"
   | "yandex"
-  | "google"
+  | "2gis"
+  | "flamp"
   | "ostrovok"
+  | "otzovik"
+  | "yell"
+  | "sutochno"
+  | "bronevik"
   | "tripadvisor"
   | "manual_upload"
   | "mock_api"
-  | "google_places"
   | "apify_dataset";
 
 export interface Review {
@@ -201,7 +205,11 @@ export type AnalysisRunSourceType =
   | "seed"
   | "mock_api"
   | "platform_api";
-export type PlatformProvider = "google_places" | "apify_dataset";
+export type PlatformProvider =
+  | "yandex_maps_dataset"
+  | "two_gis_dataset"
+  | "russian_travel_dataset"
+  | "apify_dataset";
 
 export interface AnalysisRun {
   id: UUID;
@@ -325,5 +333,6 @@ export interface PlatformIngestionRequest {
   query?: string;
   language?: string;
   limit?: number;
+  datasetUrl?: string;
   apifyDatasetUrl?: string;
 }

@@ -5,7 +5,10 @@ import { cn } from "@/shared/lib/cn";
 
 const STAGES: Array<{ id: string; label: string }> = [
   { id: "fetching_reviews", label: "Collecting reviews from platform" },
+  { id: "normalizing_reviews", label: "Normalizing text and metadata fields" },
+  { id: "deduping_reviews", label: "Deduplicating and validating rows" },
   { id: "analyzing_reviews", label: "Running sentiment/topic/segment analysis" },
+  { id: "aggregating_insights", label: "Building hotel-level aggregates and signals" },
   { id: "completed", label: "Building dashboards and recommendations" }
 ];
 

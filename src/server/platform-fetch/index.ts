@@ -1,12 +1,22 @@
 import { PlatformFetchResult, PlatformFetchRequest } from "@/server/platform-fetch/types";
-import { fetchFromGooglePlaces } from "@/server/platform-fetch/providers/google-places";
-import { fetchFromApifyDataset } from "@/server/platform-fetch/providers/apify-dataset";
+import {
+  fetchFromApifyDataset,
+  fetchFromRussianTravelDataset,
+  fetchFromTwoGisDataset,
+  fetchFromYandexMapsDataset
+} from "@/server/platform-fetch/providers/apify-dataset";
 
 export async function fetchPlatformReviews(
   request: PlatformFetchRequest
 ): Promise<PlatformFetchResult> {
-  if (request.provider === "google_places") {
-    return fetchFromGooglePlaces(request);
+  if (request.provider === "yandex_maps_dataset") {
+    return fetchFromYandexMapsDataset(request);
+  }
+  if (request.provider === "two_gis_dataset") {
+    return fetchFromTwoGisDataset(request);
+  }
+  if (request.provider === "russian_travel_dataset") {
+    return fetchFromRussianTravelDataset(request);
   }
   if (request.provider === "apify_dataset") {
     return fetchFromApifyDataset(request);

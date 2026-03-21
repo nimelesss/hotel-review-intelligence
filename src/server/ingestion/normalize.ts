@@ -77,13 +77,17 @@ function normalizeSource(value?: string): ReviewSource {
   const source = (value ?? "").trim();
   const known: ReviewSource[] = [
     "booking.com",
-    "google",
-    "ostrovok",
-    "tripadvisor",
     "yandex",
+    "2gis",
+    "flamp",
+    "ostrovok",
+    "otzovik",
+    "yell",
+    "sutochno",
+    "bronevik",
+    "tripadvisor",
     "manual_upload",
     "mock_api",
-    "google_places",
     "apify_dataset"
   ];
   return known.includes(source as ReviewSource)

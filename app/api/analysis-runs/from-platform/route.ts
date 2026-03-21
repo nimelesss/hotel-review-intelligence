@@ -14,6 +14,15 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    if (!body.datasetUrl && !body.apifyDatasetUrl) {
+      return NextResponse.json(
+        {
+          message:
+            "datasetUrl is required for platform ingestion (Yandex/2GIS/aggregator export)."
+        },
+        { status: 400 }
+      );
+    }
 
     const run = startPlatformIngestionRun({
       ...body,

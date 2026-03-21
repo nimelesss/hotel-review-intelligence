@@ -31,7 +31,7 @@ interface RunsResponse {
 
 const SAMPLE_CSV = `source,sourceReviewId,reviewDate,rating,title,text,language,authorName,stayTypeRaw
 booking.com,new-101,2026-03-10,8.6,Business trip,"Quick check-in, stable Wi-Fi, good desk for work.",ru,Ivan,Business
-google,new-102,2026-03-12,6.4,,\"Parking was overloaded and reception queue was slow.\",ru,Maria,Transit`;
+yandex,new-102,2026-03-12,6.4,,\"Parking was overloaded and reception queue was slow.\",ru,Maria,Transit`;
 
 export function UploadPage() {
   const [hotels, setHotels] = useState<Hotel[]>([]);
@@ -58,10 +58,10 @@ export function UploadPage() {
   });
 
   const [platformProvider, setPlatformProvider] =
-    useState<PlatformProvider>("google_places");
+    useState<PlatformProvider>("yandex_maps_dataset");
   const [platformQuery, setPlatformQuery] = useState("");
   const [platformLimit, setPlatformLimit] = useState("120");
-  const [apifyDatasetUrl, setApifyDatasetUrl] = useState("");
+  const [datasetUrl, setDatasetUrl] = useState("");
 
   useEffect(() => {
     void loadHotels();
@@ -216,8 +216,7 @@ export function UploadPage() {
             query: platformQuery,
             limit: Number(platformLimit || 120),
             language: "ru",
-            apifyDatasetUrl:
-              platformProvider === "apify_dataset" ? apifyDatasetUrl.trim() : undefined
+            datasetUrl: datasetUrl.trim()
           })
         }
       );
@@ -334,12 +333,16 @@ export function UploadPage() {
               setPlatformProvider(event.target.value as PlatformProvider)
             }
           >
-            <option value="google_places">Google Places API</option>
-            <option value="apify_dataset">Apify Dataset (bulk, multi-platform)</option>
+            <option value="yandex_maps_dataset">Yandex Maps (reviews dataset)</option>
+            <option value="two_gis_dataset">2GIS / Flamp (reviews dataset)</option>
+            <option value="russian_travel_dataset">
+              Russian Aggregators Mix (Yandex/2GIS/Ostrovok/etc)
+            </option>
+            <option value="apify_dataset">Generic dataset connector (legacy)</option>
           </Select>
 
           <Input
-            placeholder="Search query (hotel + city)"
+            placeholder="Query label (hotel + city, optional)"
             value={platformQuery}
             onChange={(event) => setPlatformQuery(event.target.value)}
           />
@@ -350,23 +353,24 @@ export function UploadPage() {
             onChange={(event) => setPlatformLimit(event.target.value)}
           />
 
-          {platformProvider === "apify_dataset" ? (
-            <Input
-              className="md:col-span-2 xl:col-span-4"
-              placeholder="Apify dataset URL: https://api.apify.com/v2/datasets/<id>/items?token=..."
-              value={apifyDatasetUrl}
-              onChange={(event) => setApifyDatasetUrl(event.target.value)}
-            />
-          ) : null}
+          <Input
+            className="md:col-span-2 xl:col-span-4"
+            placeholder="Dataset URL: https://api.apify.com/v2/datasets/<id>/items?token=..."
+            value={datasetUrl}
+            onChange={(event) => setDatasetUrl(event.target.value)}
+          />
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button onClick={onPlatformAnalyze} disabled={busy || !selectedHotelId}>
+          <Button
+            onClick={onPlatformAnalyze}
+            disabled={busy || !selectedHotelId || !datasetUrl.trim()}
+          >
             Fetch Platform Reviews + Analyze
           </Button>
-          <Badge variant="info">Pipeline: fetch → normalize → dedupe → analyze</Badge>
+          <Badge variant="info">Pipeline: fetch - normalize - dedupe - analyze</Badge>
         </div>
         <p className="mt-2 text-xs text-textMuted">
-          Google Places requires server env key: GOOGLE_PLACES_API_KEY. For higher volume and multi-platform imports use Apify dataset URL.
+          Focused on Russian platforms. Connect Yandex Maps, 2GIS, and local aggregators via dataset export URL.
         </p>
       </Card>
 

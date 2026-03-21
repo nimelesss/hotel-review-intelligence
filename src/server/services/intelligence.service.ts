@@ -218,7 +218,13 @@ async function executePlatformIngestion(
       query: request.query,
       limit: request.limit,
       language: request.language,
+      datasetUrl: request.datasetUrl,
       apifyDatasetUrl: request.apifyDatasetUrl
+    });
+
+    repository.updateRun(runId, {
+      stage: "normalizing_reviews",
+      progressPct: 34
     });
 
     const existingReviews = repository.listReviewsByHotel(hotel.id);
@@ -226,13 +232,26 @@ async function executePlatformIngestion(
     const mergedReviews = [...existingReviews, ...normalized.normalized];
 
     repository.updateRun(runId, {
+      stage: "deduping_reviews",
+      progressPct: 48,
+      fetchedReviews: normalized.normalized.length,
+      notes: `${platformResult.notes.join(" ")} Duplicates skipped: ${normalized.duplicates}.`
+    });
+
+    repository.updateRun(runId, {
       stage: "analyzing_reviews",
-      progressPct: 58,
+      progressPct: 64,
       fetchedReviews: normalized.normalized.length,
       notes: platformResult.notes.join(" ")
     });
 
     const outcome = runAnalysisForHotel(hotel.id, mergedReviews, "platform_api");
+
+    repository.updateRun(runId, {
+      stage: "aggregating_insights",
+      progressPct: 86,
+      fetchedReviews: normalized.normalized.length
+    });
 
     const completedRun: AnalysisRun = {
       ...outcome.run,

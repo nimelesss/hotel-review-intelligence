@@ -6,6 +6,7 @@ export interface PlatformFetchRequest {
   query?: string;
   language?: string;
   limit?: number;
+  datasetUrl?: string;
   apifyDatasetUrl?: string;
 }
 

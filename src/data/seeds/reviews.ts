@@ -58,7 +58,7 @@ export const seedReviews: Review[] = [
   makeReview({
     id: "review-cr-003",
     hotelId: "hotel-courtyard-rostov",
-    source: "google",
+    source: "2gis",
     reviewDate: "2026-01-03T00:00:00.000Z",
     rating: 7.1,
     text: "Отель хороший, но на check-in была очередь почти 25 минут. После дороги это очень неудобно.",
@@ -104,7 +104,7 @@ export const seedReviews: Review[] = [
   makeReview({
     id: "review-cr-008",
     hotelId: "hotel-courtyard-rostov",
-    source: "google",
+    source: "2gis",
     reviewDate: "2026-01-18T00:00:00.000Z",
     rating: 5.9,
     text: "В номере было пыльно и кондиционер не работал. Персонал извинился, но проблему решили только утром.",
@@ -160,7 +160,7 @@ export const seedReviews: Review[] = [
   makeReview({
     id: "review-cr-014",
     hotelId: "hotel-courtyard-rostov",
-    source: "google",
+    source: "2gis",
     reviewDate: "2026-02-10T00:00:00.000Z",
     rating: 9.3,
     text: "Свадьба проходила рядом, выбрали этот отель. Персонал помог с ранним заселением, сервис отличный.",
@@ -198,7 +198,7 @@ export const seedReviews: Review[] = [
   makeReview({
     id: "review-rk-002",
     hotelId: "hotel-riverpark-kazan",
-    source: "google",
+    source: "2gis",
     reviewDate: "2026-01-10T00:00:00.000Z",
     rating: 6.2,
     text: "Заселение медленное, на ресепшн очередь. В остальном номер нормальный.",
@@ -253,7 +253,7 @@ export const seedReviews: Review[] = [
   makeReview({
     id: "review-rk-008",
     hotelId: "hotel-riverpark-kazan",
-    source: "google",
+    source: "2gis",
     reviewDate: "2026-02-12T00:00:00.000Z",
     rating: 9.1,
     text: "Отличный сервис и доброжелательный персонал, быстро решают вопросы, рекомендую.",
