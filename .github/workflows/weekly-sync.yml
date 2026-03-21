@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: weekly-portfolio-sync
+  group: hotel-review-intelligence-vps-ops
   cancel-in-progress: false
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
           script_stop: true
           command_timeout: 45m
           script: |
-            set -e
+            set -euo pipefail
             if [ -z "${{ secrets.SYNC_TRIGGER_TOKEN }}" ]; then
               echo "SYNC_TRIGGER_TOKEN secret is missing in GitHub."
               exit 1

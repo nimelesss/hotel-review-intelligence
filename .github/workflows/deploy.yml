@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-hotel-review-intelligence
+  group: hotel-review-intelligence-vps-ops
   cancel-in-progress: true
 
 jobs:
@@ -23,11 +23,21 @@ jobs:
           script_stop: true
           command_timeout: 30m
           script: |
-            set -e
+            set -euo pipefail
             cd /srv/hotel-review-intelligence
             git fetch origin main
-            git reset --hard origin/main
-            npm ci
+            git checkout -B main origin/main
+
+            if [ -f /etc/hotel-review-intelligence.env ]; then
+              set -a
+              . /etc/hotel-review-intelligence.env
+              set +a
+            fi
+
+            node -e 'const vars=["DEFAULT_REALTIME_TARGETS_JSON","PORTFOLIO_SYNC_TARGETS_JSON"]; for (const n of vars){const v=process.env[n]; if(!v) continue; try{JSON.parse(v);} catch(e){console.error(`Invalid JSON in ${n}: ${e.message}`); process.exit(1);}}'
+
+            rm -rf .next
+            npm ci --no-audit --no-fund
             npm run build
             systemctl restart hotel-review-intelligence
             for i in $(seq 1 20); do
