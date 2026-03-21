@@ -14,6 +14,17 @@ const DEFAULT_CACHE_LIMIT = 50_000;
 const DEFAULT_MEMORY_TTL_MS = 60_000;
 const DEFAULT_INCLUDE_SEED_CATALOG = false;
 const REMOTE_HYDRATE_RETRY_MS = 5 * 60 * 1000;
+const ADDRESS_ADMIN_WORDS = [
+  "район",
+  "область",
+  "край",
+  "округ",
+  "республика",
+  "municipality",
+  "district",
+  "county",
+  "region"
+];
 
 let memoryCache: HotelSearchResult[] | null = null;
 let memoryLoadedAt = 0;
@@ -54,11 +65,11 @@ function shouldIncludeSeedCatalog(): boolean {
 }
 
 function signature(item: HotelSearchResult): string {
+  const normalizedName = normalize(stripCitySuffix(item.name, item.city));
+  const normalizedCity = normalize(item.city);
+  const normalizedAddress = normalize(compactAddress(item.address, item.city, item.country));
   const externalPart = item.externalId ? item.externalId.trim() : "";
-  if (externalPart) {
-    return `ext:${externalPart}`;
-  }
-  return `name:${normalize(item.name)}|city:${normalize(item.city)}|addr:${normalize(item.address)}`;
+  return `name:${normalizedName}|city:${normalizedCity}|addr:${normalizedAddress}|ext:${externalPart}`;
 }
 
 function scoreCandidate(item: HotelSearchResult, query: string): number {
@@ -286,7 +297,7 @@ function sanitizeCatalogItem(item: HotelSearchResult): HotelSearchResult | null 
     name,
     city,
     country,
-    address,
+    address: compactAddress(address, city, country) || `${name}, ${city}`,
     coordinates: item.coordinates,
     source: item.source || "catalog_import"
   };
@@ -294,4 +305,57 @@ function sanitizeCatalogItem(item: HotelSearchResult): HotelSearchResult | null 
 
 function isSeedItem(item: HotelSearchResult): boolean {
   return item.source === "catalog_seed" || item.externalId.startsWith("seed-");
+}
+
+function stripCitySuffix(name: string, city: string): string {
+  const normalizedName = normalizeWhitespace(name);
+  const normalizedCity = normalizeWhitespace(city);
+  if (!normalizedName || !normalizedCity) {
+    return normalizedName;
+  }
+
+  const pattern = new RegExp(`(?:,|\\-|\\s)+${escapeRegExp(normalizedCity)}$`, "i");
+  return normalizedName.replace(pattern, "").trim();
+}
+
+function compactAddress(address: string, city: string, country: string): string {
+  const cleaned = address
+    .split(",")
+    .map((part) => normalizeWhitespace(decodeEscapedUnicode(part)))
+    .filter(Boolean)
+    .filter((part) => {
+      const normalized = normalize(part);
+      return !ADDRESS_ADMIN_WORDS.some((word) => normalized.includes(word));
+    });
+
+  const deduped = dedupe(cleaned);
+  const limited = deduped.slice(0, 3);
+  if (city && !limited.some((part) => normalize(part) === normalize(city))) {
+    limited.push(city);
+  }
+  if (country && !limited.some((part) => normalize(part) === normalize(country))) {
+    limited.push(country);
+  }
+
+  return dedupe(limited).slice(0, 3).join(", ");
+}
+
+function dedupe(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  values.forEach((value) => {
+    const key = normalize(value);
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    result.push(value);
+  });
+
+  return result;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

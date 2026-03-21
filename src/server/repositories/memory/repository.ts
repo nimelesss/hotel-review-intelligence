@@ -18,6 +18,7 @@ import {
   IntelligenceRepository,
   RepositorySnapshot
 } from "@/server/repositories/types";
+import { normalizeSearchText, normalizeWhitespace } from "@/shared/lib/text";
 
 interface MemoryState {
   hotels: Hotel[];
@@ -92,12 +93,11 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
       }
     }
 
+    const requestCanonicalName = canonicalHotelName(normalizedName, normalizedCity);
     const duplicate = this.state.hotels.find(
       (hotel) =>
-        hotel.name.toLocaleLowerCase("ru-RU") ===
-          normalizedName.toLocaleLowerCase("ru-RU") &&
-        hotel.city.toLocaleLowerCase("ru-RU") ===
-          normalizedCity.toLocaleLowerCase("ru-RU")
+        sameCity(hotel.city, normalizedCity) &&
+        canonicalHotelName(hotel.name, hotel.city) === requestCanonicalName
     );
     if (duplicate) {
       const merged = mergeHotel(duplicate, request);
@@ -388,6 +388,34 @@ function mergeHotel(hotel: Hotel, request: CreateHotelRequest): Hotel {
   };
 
   return merged;
+}
+
+function canonicalHotelName(name: string, city: string): string {
+  const normalized = normalizeHotelMatchValue(name);
+  const cityNormalized = normalizeHotelMatchValue(city);
+  if (!normalized) {
+    return "";
+  }
+
+  const citySuffixPattern = new RegExp(`(?:,|\\-|\\s)+${escapeRegExp(cityNormalized)}$`, "i");
+  const cleaned = normalized.replace(citySuffixPattern, "").trim();
+  return cleaned || normalized;
+}
+
+function sameCity(left: string, right: string): boolean {
+  return normalizeHotelMatchValue(left) === normalizeHotelMatchValue(right);
+}
+
+function normalizeHotelMatchValue(value: string): string {
+  const normalized = normalizeSearchText(normalizeWhitespace(value || ""));
+  return normalized
+    .replace(/\b(отель|гостиница|hotel|hostel|mini-hotel|мини-отель)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function applyReviewFilters(
