@@ -143,7 +143,7 @@ export async function GET(request: Request) {
       name: hotel.name,
       city: hotel.city,
       country: hotel.country,
-      address: hotel.address,
+      address: simplifyAddress(hotel.address, hotel.city, hotel.country) || hotel.address,
       coordinates: hotel.coordinates,
       source: "catalog_import" as const
     }));
@@ -391,7 +391,7 @@ function scoreResult(item: HotelSearchResult, query: string): number {
     score += 30;
   }
 
-  if (item.source === "catalog_import") {
+  if (item.source === "catalog_import" && score > 0) {
     score += 4;
   }
 
