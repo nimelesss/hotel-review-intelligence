@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AnalysisRun,
   DashboardPayload,
@@ -43,6 +43,8 @@ interface RealtimeSyncResponse {
     warnings: string[];
   };
 }
+
+const SEARCH_DEBOUNCE_MS = 360;
 
 export function DashboardPage() {
   const [hotels, setHotels] = useState<Hotel[]>([]);
@@ -102,32 +104,63 @@ export function DashboardPage() {
     [hotels, selectedHotelId]
   );
 
-  const onSearchHotels = async () => {
-    const query = searchQuery.trim();
+  const searchHotelsByQuery = useCallback(async (queryInput: string, silent = false) => {
+    const query = queryInput.trim();
     if (query.length < 2) {
-      setSearchError("Введите минимум 2 символа.");
+      if (!silent) {
+        setSearchError("\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043c\u0438\u043d\u0438\u043c\u0443\u043c 2 \u0441\u0438\u043c\u0432\u043e\u043b\u0430.");
+      }
+      setSearchResults([]);
       return;
     }
+
     setSearching(true);
-    setSearchError(null);
-    setSyncMessage(null);
+    if (!silent) {
+      setSearchError(null);
+      setSyncMessage(null);
+    }
+
     try {
       const response = await fetchJson<SearchHotelsResponse>(
         `/api/hotels/search?q=${encodeURIComponent(query)}&limit=8`
       );
       setSearchResults(response.items);
-      if (!response.items.length) {
+
+      if (!response.items.length && !silent) {
         setSearchError(
-          "По этому запросу отели не найдены. Попробуйте добавить город, например: «Hilton Казань»."
+          "\u041f\u043e \u044d\u0442\u043e\u043c\u0443 \u0437\u0430\u043f\u0440\u043e\u0441\u0443 \u043e\u0442\u0435\u043b\u0438 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u044b. \u0423\u0442\u043e\u0447\u043d\u0438\u0442\u0435 \u043e\u0431\u044a\u0435\u043a\u0442 \u0438 \u0433\u043e\u0440\u043e\u0434, \u043d\u0430\u043f\u0440\u0438\u043c\u0435\u0440: \u00abCourtyard by Marriott \u0420\u043e\u0441\u0442\u043e\u0432-\u043d\u0430-\u0414\u043e\u043d\u0443\u00bb."
         );
       }
     } catch (err) {
-      setSearchError(
-        err instanceof Error ? err.message : "Поиск временно недоступен."
-      );
+      if (!silent) {
+        setSearchError(
+          err instanceof Error
+            ? err.message
+            : "\u041f\u043e\u0438\u0441\u043a \u0432\u0440\u0435\u043c\u0435\u043d\u043d\u043e \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d."
+        );
+      }
     } finally {
       setSearching(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (query.length < 2) {
+      setSearchResults([]);
+      setSearchError(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      void searchHotelsByQuery(query, true);
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, searchHotelsByQuery]);
+
+  const onSearchHotels = async () => {
+    await searchHotelsByQuery(searchQuery, false);
   };
 
   const onCreateHotelFromSearch = async (candidate: HotelSearchResult) => {
@@ -583,7 +616,7 @@ function SearchHero(props: {
       <div className="grid gap-3 md:grid-cols-[1fr_auto]">
         <Input
           value={searchQuery}
-          placeholder="Например: Marriott Ростов-на-Дону"
+          placeholder="\u041d\u0430\u043f\u0440\u0438\u043c\u0435\u0440: Courtyard by Marriott \u0420\u043e\u0441\u0442\u043e\u0432-\u043d\u0430-\u0414\u043e\u043d\u0443"
           onChange={(event) => setSearchQuery(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
@@ -599,9 +632,15 @@ function SearchHero(props: {
           disabled={searching}
           className={searching ? "animate-pulse" : ""}
         >
-          {searching ? "Идет поиск..." : "Найти отель"}
+          {searching
+            ? "\u0418\u0449\u0435\u043c \u043e\u0442\u0435\u043b\u0438..."
+            : "\u041d\u0430\u0439\u0442\u0438 \u043e\u0442\u0435\u043b\u044c"}
         </Button>
       </div>
+
+      <p className="mt-2 text-xs text-textMuted">
+        {"\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0438 \u043f\u043e\u044f\u0432\u043b\u044f\u044e\u0442\u0441\u044f \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438 \u043f\u0440\u0438 \u0432\u0432\u043e\u0434\u0435 2+ \u0441\u0438\u043c\u0432\u043e\u043b\u043e\u0432."}
+      </p>
 
       {searchError ? <p className="mt-3 text-sm text-danger">{searchError}</p> : null}
 

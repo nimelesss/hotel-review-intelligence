@@ -352,7 +352,7 @@ export interface HotelSearchResult {
   country: string;
   address: string;
   coordinates?: Coordinates;
-  source: "osm_nominatim";
+  source: "osm_nominatim" | "catalog_seed" | "catalog_import";
 }
 
 export interface PlatformIngestionRequest {
