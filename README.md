@@ -36,6 +36,33 @@ https://api.apify.com/v2/datasets/<dataset-id>/items?token=<token>
 
 You can also use your own JSON export endpoint if it returns array-based review records.
 
+## Hybrid Sync Strategy
+The product supports both modes:
+- Portfolio weekly sync (all hotels + all configured providers)
+- Realtime sync for one selected hotel (fan-out across all configured providers)
+
+### Environment config for orchestration
+Set on server (`/etc/hotel-review-intelligence.env`):
+
+```bash
+SYNC_TRIGGER_TOKEN=replace_with_long_random_token
+PORTFOLIO_SYNC_TARGETS_JSON=[{"hotelId":"hotel-courtyard-rostov","provider":"yandex_maps_dataset","datasetUrl":"https://api.apify.com/v2/datasets/<id>/items?token=<token>","limit":300},{"hotelId":"hotel-courtyard-rostov","provider":"two_gis_dataset","datasetUrl":"https://api.apify.com/v2/datasets/<id>/items?token=<token>","limit":300}]
+```
+
+Supported target fields:
+- `hotelId` or `hotelName` (one is required)
+- `provider`
+- `datasetUrl`
+- optional: `query`, `language`, `limit`, `enabled`
+
+### API endpoints
+- `POST /api/sync/realtime-hotel`  
+  Starts fan-out sync for one hotel using configured targets.
+- `POST /api/sync/portfolio`  
+  Starts all-hotel sync. Requires `Authorization: Bearer <SYNC_TRIGGER_TOKEN>`.
+- `GET /api/sync/portfolio`  
+  Returns readiness summary. Requires the same bearer token.
+
 ## Quick Start
 Requires Node.js 20+.
 
@@ -57,6 +84,7 @@ Open: `http://localhost:3000`
 ## Deployment
 Project contains GitHub Actions workflow for VPS deployment:
 - `.github/workflows/deploy.yml`
+- `.github/workflows/weekly-sync.yml` (weekly sync trigger)
 
 Expected server app URL example:
 - `http://<server-ip>:3100`
