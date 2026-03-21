@@ -1,10 +1,12 @@
 import {
   AnalysisRun,
+  Hotel,
   PlatformIngestionRequest,
   PlatformProvider
 } from "@/entities/types";
 import { getRepository } from "@/server/repositories";
 import { startPlatformIngestionRun } from "@/server/services/intelligence.service";
+import { canFetchWithoutDatasetUrl } from "@/server/platform-fetch/providers/apify-dataset";
 
 type SyncMode = "manual" | "weekly";
 
@@ -13,6 +15,7 @@ interface RawPortfolioTarget {
   hotelName?: string;
   provider?: string;
   datasetUrl?: string;
+  datasetUrlTemplate?: string;
   query?: string;
   language?: string;
   limit?: number;
@@ -23,7 +26,8 @@ interface PortfolioTarget {
   hotelId?: string;
   hotelName?: string;
   provider: PlatformProvider;
-  datasetUrl: string;
+  datasetUrl?: string;
+  datasetUrlTemplate?: string;
   query?: string;
   language: string;
   limit?: number;
@@ -33,6 +37,7 @@ interface PortfolioTarget {
 interface RawFallbackTarget {
   provider?: string;
   datasetUrl?: string;
+  datasetUrlTemplate?: string;
   query?: string;
   language?: string;
   limit?: number;
@@ -41,7 +46,8 @@ interface RawFallbackTarget {
 
 interface FallbackTarget {
   provider: PlatformProvider;
-  datasetUrl: string;
+  datasetUrl?: string;
+  datasetUrlTemplate?: string;
   query?: string;
   language: string;
   limit?: number;
@@ -74,18 +80,18 @@ const PROVIDERS = new Set<PlatformProvider>([
   "apify_dataset"
 ]);
 
+const DEFAULT_INCLUDE_FALLBACK_UNCOVERED = true;
+
 export function getPortfolioSyncReadiness(): PortfolioSyncReadiness {
   const repository = getRepository();
   const hotels = repository.listHotels();
-  const targets = readPortfolioTargets();
+  const explicitTargets = readPortfolioTargets().filter((target) => target.enabled);
+  const fallbackTargets = readFallbackTargets().filter((target) => target.enabled);
 
   const resolvedHotelIds = new Set<string>();
   const providers = new Set<PlatformProvider>();
 
-  targets.forEach((target) => {
-    if (!target.enabled) {
-      return;
-    }
+  explicitTargets.forEach((target) => {
     const hotelId = resolveTargetHotelId(target);
     if (!hotelId) {
       return;
@@ -94,50 +100,52 @@ export function getPortfolioSyncReadiness(): PortfolioSyncReadiness {
     providers.add(target.provider);
   });
 
-  const hotelsWithoutTargets = hotels
-    .filter((hotel) => !resolvedHotelIds.has(hotel.id))
-    .map((hotel) => hotel.name);
+  fallbackTargets.forEach((target) => providers.add(target.provider));
+
+  const fallbackCoversAllHotels = fallbackTargets.length > 0;
+  const hotelsWithoutTargets = fallbackCoversAllHotels
+    ? []
+    : hotels.filter((hotel) => !resolvedHotelIds.has(hotel.id)).map((hotel) => hotel.name);
+
+  const hotelsCovered = fallbackCoversAllHotels ? hotels.length : resolvedHotelIds.size;
+
+  const targetsTotal =
+    explicitTargets.length +
+    (fallbackCoversAllHotels ? fallbackTargets.length * Math.max(hotels.length, 1) : 0);
 
   return {
-    targetsTotal: targets.filter((target) => target.enabled).length,
+    targetsTotal,
     hotelsInSystem: hotels.length,
-    hotelsCovered: resolvedHotelIds.size,
+    hotelsCovered,
     providers: [...providers],
     hotelsWithoutTargets
   };
 }
 
 export function startPortfolioSync(mode: SyncMode, hotelIds?: string[]): PortfolioSyncResult {
-  const repository = getRepository();
-  const targets = readPortfolioTargets();
-  if (!targets.length) {
+  const explicitTargets = readPortfolioTargets().filter((target) => target.enabled);
+  const fallbackTargets = readFallbackTargets().filter((target) => target.enabled);
+
+  if (!explicitTargets.length && !fallbackTargets.length) {
     throw new Error(
-      "Переменная PORTFOLIO_SYNC_TARGETS_JSON пуста. Настройте источники синхронизации."
+      "Источники синхронизации не настроены. Укажите PORTFOLIO_SYNC_TARGETS_JSON и/или DEFAULT_REALTIME_TARGETS_JSON."
     );
   }
 
-  const filterSet = hotelIds?.length
-    ? new Set(
-        hotelIds.filter((id) => {
-          const candidate = id.trim();
-          return !!candidate && !!repository.getHotelById(candidate);
-        })
-      )
-    : null;
-
-  if (hotelIds?.length && filterSet && filterSet.size === 0) {
-    throw new Error("Список hotelIds не содержит валидных отелей.");
+  const repository = getRepository();
+  const allHotels = repository.listHotels();
+  const hotelsScope = resolveHotelsScope(allHotels, hotelIds);
+  if (!hotelsScope.length) {
+    throw new Error("В системе нет отелей для запуска синхронизации.");
   }
 
+  const scopeSet = new Set(hotelsScope.map((hotel) => hotel.id));
   const warnings: string[] = [];
   const runs: AnalysisRun[] = [];
   const coveredHotels = new Set<string>();
+  const coveredByExplicit = new Set<string>();
 
-  targets.forEach((target) => {
-    if (!target.enabled) {
-      return;
-    }
-
+  explicitTargets.forEach((target) => {
     const hotelId = resolveTargetHotelId(target);
     if (!hotelId) {
       warnings.push(
@@ -145,42 +153,53 @@ export function startPortfolioSync(mode: SyncMode, hotelIds?: string[]): Portfol
       );
       return;
     }
-    if (filterSet && !filterSet.has(hotelId)) {
+    if (!scopeSet.has(hotelId)) {
       return;
     }
 
-    try {
-      const request: PlatformIngestionRequest = {
-        hotelId,
-        provider: target.provider,
-        datasetUrl: target.datasetUrl,
-        query: target.query,
-        language: target.language,
-        limit: target.limit
-      };
-      const run = startPlatformIngestionRun(request);
+    const run = runTargetForHotel(hotelId, target, warnings);
+    if (run) {
       runs.push(run);
       coveredHotels.add(hotelId);
-    } catch (error) {
-      warnings.push(
-        `Источник для отеля "${target.hotelId || target.hotelName || hotelId}" завершился ошибкой: ${
-          error instanceof Error ? error.message : "неизвестная ошибка"
-        }`
-      );
+      coveredByExplicit.add(hotelId);
     }
   });
+
+  const includeFallbackForUncovered = shouldIncludeFallbackForUncovered(mode);
+  if (fallbackTargets.length && includeFallbackForUncovered) {
+    hotelsScope.forEach((hotel) => {
+      if (coveredByExplicit.has(hotel.id)) {
+        return;
+      }
+      const runsBefore = runs.length;
+      fallbackTargets.forEach((target) => {
+        const run = runFallbackForHotel(hotel, target, warnings);
+        if (run) {
+          runs.push(run);
+        }
+      });
+      if (runs.length > runsBefore) {
+        coveredHotels.add(hotel.id);
+      }
+    });
+  }
+
+  const explicitTotal = explicitTargets.filter((target) => {
+    const hotelId = resolveTargetHotelId(target);
+    return !!hotelId && scopeSet.has(hotelId);
+  }).length;
+
+  const fallbackHotelsCount =
+    includeFallbackForUncovered && fallbackTargets.length
+      ? hotelsScope.filter((hotel) => !coveredByExplicit.has(hotel.id)).length
+      : 0;
+
+  const targetsTotal = explicitTotal + fallbackHotelsCount * fallbackTargets.length;
 
   return {
     mode,
     startedAt: new Date().toISOString(),
-    targetsTotal: filterSet
-      ? targets.filter(
-          (target) =>
-            target.enabled &&
-            resolveTargetHotelId(target) &&
-            filterSet.has(resolveTargetHotelId(target) as string)
-        ).length
-      : targets.filter((target) => target.enabled).length,
+    targetsTotal,
     targetsStarted: runs.length,
     hotelsCovered: coveredHotels.size,
     runs,
@@ -196,68 +215,194 @@ export function startRealtimeSyncForHotel(hotelIdRaw: string): PortfolioSyncResu
     throw new Error("hotelId не найден.");
   }
 
-  const targets = readPortfolioTargets().filter((target) => target.enabled);
-  const matchingHotelTargets = targets.filter(
-    (target) => resolveTargetHotelId(target) === hotelId
-  );
-
-  if (matchingHotelTargets.length > 0) {
-    return startPortfolioSync("manual", [hotelId]);
-  }
-
-  return startRealtimeSyncWithFallback(hotelId);
-}
-
-function startRealtimeSyncWithFallback(hotelId: string): PortfolioSyncResult {
-  const repository = getRepository();
-  const hotel = repository.getHotelById(hotelId);
-  if (!hotel) {
-    throw new Error("Отель не найден.");
-  }
-
-  const fallbackTargets = readFallbackTargets();
-  if (!fallbackTargets.length) {
-    throw new Error(
-      "Для этого отеля нет персональных источников. Добавьте PORTFOLIO_SYNC_TARGETS_JSON или DEFAULT_REALTIME_TARGETS_JSON."
-    );
-  }
+  const explicitTargets = readPortfolioTargets().filter((target) => target.enabled);
+  const matchingTargets = explicitTargets.filter((target) => resolveTargetHotelId(target) === hotelId);
 
   const warnings: string[] = [];
   const runs: AnalysisRun[] = [];
-  const baseQuery = `${hotel.name} ${hotel.city}`.trim();
 
-  fallbackTargets.forEach((target) => {
-    if (!target.enabled) {
-      return;
-    }
-    try {
-      const run = startPlatformIngestionRun({
-        hotelId,
-        provider: target.provider,
-        datasetUrl: target.datasetUrl,
-        query: target.query || baseQuery,
-        language: target.language,
-        limit: target.limit
-      });
-      runs.push(run);
-    } catch (error) {
-      warnings.push(
-        `Источник ${target.provider} завершился ошибкой: ${
-          error instanceof Error ? error.message : "неизвестная ошибка"
-        }`
+  if (matchingTargets.length) {
+    matchingTargets.forEach((target) => {
+      const run = runTargetForHotel(hotelId, target, warnings);
+      if (run) {
+        runs.push(run);
+      }
+    });
+  } else {
+    const fallbackTargets = readFallbackTargets().filter((target) => target.enabled);
+    if (!fallbackTargets.length) {
+      throw new Error(
+        "Для этого отеля нет настроенных источников. Добавьте PORTFOLIO_SYNC_TARGETS_JSON или DEFAULT_REALTIME_TARGETS_JSON."
       );
     }
-  });
+
+    fallbackTargets.forEach((target) => {
+      const run = runFallbackForHotel(hotel, target, warnings);
+      if (run) {
+        runs.push(run);
+      }
+    });
+  }
 
   return {
     mode: "manual",
     startedAt: new Date().toISOString(),
-    targetsTotal: fallbackTargets.filter((target) => target.enabled).length,
+    targetsTotal: runs.length,
     targetsStarted: runs.length,
-    hotelsCovered: runs.length > 0 ? 1 : 0,
+    hotelsCovered: runs.length ? 1 : 0,
     runs,
     warnings
   };
+}
+
+function resolveHotelsScope(allHotels: Hotel[], hotelIds?: string[]): Hotel[] {
+  if (!hotelIds?.length) {
+    return allHotels;
+  }
+
+  const idSet = new Set(
+    hotelIds
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0)
+  );
+
+  return allHotels.filter((hotel) => idSet.has(hotel.id));
+}
+
+function runTargetForHotel(
+  hotelId: string,
+  target: PortfolioTarget,
+  warnings: string[]
+): AnalysisRun | null {
+  const repository = getRepository();
+  const hotel = repository.getHotelById(hotelId);
+  if (!hotel) {
+    warnings.push(`Источник пропущен: отель ${hotelId} не найден.`);
+    return null;
+  }
+
+  try {
+    const request = buildPlatformRequestForHotel(hotel, target);
+    return startPlatformIngestionRun(request);
+  } catch (error) {
+    warnings.push(
+      `Источник ${target.provider} для отеля "${hotel.name}" завершился ошибкой: ${
+        error instanceof Error ? error.message : "неизвестная ошибка"
+      }`
+    );
+    return null;
+  }
+}
+
+function runFallbackForHotel(
+  hotel: Hotel,
+  target: FallbackTarget,
+  warnings: string[]
+): AnalysisRun | null {
+  try {
+    const request = buildPlatformRequestForHotel(hotel, target);
+    return startPlatformIngestionRun(request);
+  } catch (error) {
+    warnings.push(
+      `Fallback-источник ${target.provider} для отеля "${hotel.name}" завершился ошибкой: ${
+        error instanceof Error ? error.message : "неизвестная ошибка"
+      }`
+    );
+    return null;
+  }
+}
+
+type TargetBase = {
+  provider: PlatformProvider;
+  datasetUrl?: string;
+  datasetUrlTemplate?: string;
+  query?: string;
+  language: string;
+  limit?: number;
+};
+
+function buildPlatformRequestForHotel(
+  hotel: Hotel,
+  target: TargetBase
+): PlatformIngestionRequest {
+  const baseQuery = `${hotel.name} ${hotel.city}`.trim();
+  const query = interpolateQueryTemplate(target.query || baseQuery, hotel, baseQuery, target.provider);
+  const datasetUrl = resolveDatasetUrl(
+    hotel,
+    target.provider,
+    target.datasetUrl,
+    target.datasetUrlTemplate,
+    query
+  );
+
+  if (!datasetUrl && !canFetchWithoutDatasetUrl(target.provider)) {
+    throw new Error(
+      `Для провайдера ${target.provider} не указан datasetUrl/datasetUrlTemplate и не настроен runtime collector.`
+    );
+  }
+
+  return {
+    hotelId: hotel.id,
+    provider: target.provider,
+    datasetUrl: datasetUrl || undefined,
+    query,
+    language: target.language || "ru",
+    limit: target.limit
+  };
+}
+
+function resolveDatasetUrl(
+  hotel: Hotel,
+  provider: PlatformProvider,
+  datasetUrl?: string,
+  datasetUrlTemplate?: string,
+  query?: string
+): string {
+  const raw = (datasetUrlTemplate || datasetUrl || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  const querySafe = query || `${hotel.name} ${hotel.city}`.trim();
+
+  return raw
+    .replaceAll("{provider}", encodeURIComponent(provider))
+    .replaceAll("{hotelId}", encodeURIComponent(hotel.id))
+    .replaceAll("{hotelName}", encodeURIComponent(hotel.name))
+    .replaceAll("{city}", encodeURIComponent(hotel.city))
+    .replaceAll("{country}", encodeURIComponent(hotel.country))
+    .replaceAll("{queryEncoded}", encodeURIComponent(querySafe))
+    .replaceAll("{query}", encodeURIComponent(querySafe));
+}
+
+function interpolateQueryTemplate(
+  template: string,
+  hotel: Hotel,
+  query: string,
+  provider: PlatformProvider
+): string {
+  return template
+    .replaceAll("{provider}", provider)
+    .replaceAll("{hotelId}", hotel.id)
+    .replaceAll("{hotelName}", hotel.name)
+    .replaceAll("{city}", hotel.city)
+    .replaceAll("{country}", hotel.country)
+    .replaceAll("{query}", query)
+    .trim();
+}
+
+function shouldIncludeFallbackForUncovered(mode: SyncMode): boolean {
+  if (mode === "weekly") {
+    return true;
+  }
+
+  const raw = (process.env.PORTFOLIO_SYNC_INCLUDE_FALLBACK_UNCOVERED || "").trim();
+  if (!raw) {
+    return DEFAULT_INCLUDE_FALLBACK_UNCOVERED;
+  }
+
+  const normalized = raw.toLocaleLowerCase("ru-RU");
+  return ["1", "true", "yes", "on"].includes(normalized);
 }
 
 function readPortfolioTargets(): PortfolioTarget[] {
@@ -266,45 +411,41 @@ function readPortfolioTargets(): PortfolioTarget[] {
     return [];
   }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error("PORTFOLIO_SYNC_TARGETS_JSON содержит некорректный JSON.");
-  }
-  if (!Array.isArray(parsed)) {
-    throw new Error("PORTFOLIO_SYNC_TARGETS_JSON должен быть массивом JSON-объектов.");
-  }
+  const parsed = parseTargetsJson(raw, "PORTFOLIO_SYNC_TARGETS_JSON");
 
-  const normalized: PortfolioTarget[] = [];
-  parsed.forEach((item, index) => {
-    const candidate = normalizeRawTarget(item);
-    const provider = normalizeProvider(candidate.provider);
+  return parsed.map((item, index) => {
+    const target = normalizeRawPortfolioTarget(item);
+    const provider = normalizeProvider(target.provider);
     if (!provider) {
       throw new Error(`Источник #${index + 1}: неизвестный provider.`);
     }
-    if (!candidate.datasetUrl || !candidate.datasetUrl.startsWith("http")) {
-      throw new Error(`Источник #${index + 1}: datasetUrl должен быть абсолютным URL.`);
-    }
-    if (!candidate.hotelId && !candidate.hotelName) {
+
+    const datasetUrl = normalizeOptional(target.datasetUrl);
+    const datasetUrlTemplate = normalizeOptional(target.datasetUrlTemplate);
+    if (!datasetUrl && !datasetUrlTemplate && !canFetchWithoutDatasetUrl(provider)) {
       throw new Error(
-        `Источник #${index + 1}: укажите hotelId или hotelName для сопоставления.`
+        `Источник #${index + 1}: укажите datasetUrl/datasetUrlTemplate или настройте runtime collector для ${provider}.`
       );
     }
 
-    normalized.push({
-      hotelId: normalizeOptional(candidate.hotelId),
-      hotelName: normalizeOptional(candidate.hotelName),
-      provider,
-      datasetUrl: candidate.datasetUrl.trim(),
-      query: normalizeOptional(candidate.query),
-      language: normalizeOptional(candidate.language) || "ru",
-      limit: normalizeLimit(candidate.limit),
-      enabled: candidate.enabled !== false
-    });
-  });
+    if (!normalizeOptional(target.hotelId) && !normalizeOptional(target.hotelName)) {
+      throw new Error(
+        `Источник #${index + 1}: укажите hotelId или hotelName для сопоставления отеля.`
+      );
+    }
 
-  return normalized;
+    return {
+      hotelId: normalizeOptional(target.hotelId),
+      hotelName: normalizeOptional(target.hotelName),
+      provider,
+      datasetUrl,
+      datasetUrlTemplate,
+      query: normalizeOptional(target.query),
+      language: normalizeOptional(target.language) || "ru",
+      limit: normalizeLimit(target.limit),
+      enabled: target.enabled !== false
+    };
+  });
 }
 
 function readFallbackTargets(): FallbackTarget[] {
@@ -313,67 +454,85 @@ function readFallbackTargets(): FallbackTarget[] {
     return [];
   }
 
+  const parsed = parseTargetsJson(raw, "DEFAULT_REALTIME_TARGETS_JSON");
+
+  return parsed.map((item, index) => {
+    const target = normalizeRawFallbackTarget(item);
+    const provider = normalizeProvider(target.provider);
+    if (!provider) {
+      throw new Error(`Fallback-источник #${index + 1}: неизвестный provider.`);
+    }
+
+    const datasetUrl = normalizeOptional(target.datasetUrl);
+    const datasetUrlTemplate = normalizeOptional(target.datasetUrlTemplate);
+    if (!datasetUrl && !datasetUrlTemplate && !canFetchWithoutDatasetUrl(provider)) {
+      throw new Error(
+        `Fallback-источник #${index + 1}: укажите datasetUrl/datasetUrlTemplate или настройте runtime collector для ${provider}.`
+      );
+    }
+
+    return {
+      provider,
+      datasetUrl,
+      datasetUrlTemplate,
+      query: normalizeOptional(target.query),
+      language: normalizeOptional(target.language) || "ru",
+      limit: normalizeLimit(target.limit),
+      enabled: target.enabled !== false
+    };
+  });
+}
+
+function parseTargetsJson(raw: string, envName: string): unknown[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error("DEFAULT_REALTIME_TARGETS_JSON содержит некорректный JSON.");
+    throw new Error(`${envName} содержит некорректный JSON.`);
   }
+
   if (!Array.isArray(parsed)) {
-    throw new Error("DEFAULT_REALTIME_TARGETS_JSON должен быть массивом JSON-объектов.");
+    throw new Error(`${envName} должен быть массивом JSON-объектов.`);
   }
 
-  const normalized: FallbackTarget[] = [];
-  parsed.forEach((item, index) => {
-    const candidate = normalizeFallbackTarget(item);
-    const provider = normalizeProvider(candidate.provider);
-    if (!provider) {
-      throw new Error(`Fallback источник #${index + 1}: неизвестный provider.`);
-    }
-    if (!candidate.datasetUrl || !candidate.datasetUrl.startsWith("http")) {
-      throw new Error(
-        `Fallback источник #${index + 1}: datasetUrl должен быть абсолютным URL.`
-      );
-    }
-    normalized.push({
-      provider,
-      datasetUrl: candidate.datasetUrl.trim(),
-      query: normalizeOptional(candidate.query),
-      language: normalizeOptional(candidate.language) || "ru",
-      limit: normalizeLimit(candidate.limit),
-      enabled: candidate.enabled !== false
-    });
-  });
-
-  return normalized;
+  return parsed;
 }
 
-function resolveTargetHotelId(target: PortfolioTarget): string | null {
+function resolveTargetHotelId(target: Pick<PortfolioTarget, "hotelId" | "hotelName">): string | null {
   const repository = getRepository();
+  const hotels = repository.listHotels();
 
   if (target.hotelId) {
-    return repository.getHotelById(target.hotelId)?.id ?? null;
+    const byId = repository.getHotelById(target.hotelId);
+    if (byId) {
+      return byId.id;
+    }
+
+    const byExternalId = hotels.find((hotel) => hotel.externalId === target.hotelId);
+    if (byExternalId) {
+      return byExternalId.id;
+    }
   }
 
-  if (!target.hotelName) {
-    return null;
+  if (target.hotelName) {
+    const normalized = target.hotelName.toLocaleLowerCase("ru-RU").trim();
+    const byName = hotels.find((hotel) => hotel.name.toLocaleLowerCase("ru-RU").trim() === normalized);
+    if (byName) {
+      return byName.id;
+    }
   }
 
-  const normalized = target.hotelName.toLocaleLowerCase("ru-RU");
-  const match = repository.listHotels().find(
-    (hotel) => hotel.name.toLocaleLowerCase("ru-RU") === normalized
-  );
-  return match?.id ?? null;
+  return null;
 }
 
-function normalizeRawTarget(item: unknown): RawPortfolioTarget {
+function normalizeRawPortfolioTarget(item: unknown): RawPortfolioTarget {
   if (!item || typeof item !== "object") {
     return {};
   }
   return item as RawPortfolioTarget;
 }
 
-function normalizeFallbackTarget(item: unknown): RawFallbackTarget {
+function normalizeRawFallbackTarget(item: unknown): RawFallbackTarget {
   if (!item || typeof item !== "object") {
     return {};
   }

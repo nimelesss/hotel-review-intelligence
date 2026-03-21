@@ -4,6 +4,7 @@ import {
   resolveHotelId,
   startPlatformIngestionRun
 } from "@/server/services/intelligence.service";
+import { canFetchWithoutDatasetUrl } from "@/server/platform-fetch/providers/apify-dataset";
 
 export async function POST(request: Request) {
   try {
@@ -14,11 +15,13 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    if (!body.datasetUrl && !body.apifyDatasetUrl) {
+
+    const hasDatasetUrl = !!body.datasetUrl || !!body.apifyDatasetUrl;
+    if (!hasDatasetUrl && !canFetchWithoutDatasetUrl(body.provider)) {
       return NextResponse.json(
         {
           message:
-            "Для запуска укажите datasetUrl (или apifyDatasetUrl) с выгрузкой отзывов."
+            "Для запуска укажите datasetUrl/apifyDatasetUrl либо настройте runtime collector (APIFY_TOKEN + APIFY_ACTOR_*)."
         },
         { status: 400 }
       );
