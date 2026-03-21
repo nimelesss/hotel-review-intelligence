@@ -1,0 +1,35 @@
+name: Deploy To VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-hotel-review-intelligence
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script_stop: true
+          command_timeout: 30m
+          script: |
+            set -e
+            cd /srv/hotel-review-intelligence
+            git fetch origin main
+            git reset --hard origin/main
+            npm ci
+            npm run build
+            systemctl restart hotel-review-intelligence
+            systemctl is-active --quiet hotel-review-intelligence
+            curl -fsS http://127.0.0.1:3100/api/hotels >/dev/null
+            echo "Deploy completed successfully"
