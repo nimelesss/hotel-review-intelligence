@@ -94,7 +94,9 @@ function castSource(value: string | null): ReviewSource | undefined {
     "tripadvisor",
     "yandex",
     "manual_upload",
-    "mock_api"
+    "mock_api",
+    "google_places",
+    "apify_dataset"
   ].includes(value)
     ? (value as ReviewSource)
     : undefined;

@@ -1,5 +1,6 @@
 import {
   AnalysisRun,
+  CreateHotelRequest,
   Hotel,
   HotelAggregate,
   Recommendation,
@@ -43,6 +44,45 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
 
   listHotels(): Hotel[] {
     return [...this.state.hotels];
+  }
+
+  createHotel(request: CreateHotelRequest): Hotel {
+    const normalizedName = request.name.trim();
+    const normalizedCity = request.city.trim();
+    if (!normalizedName || !normalizedCity) {
+      throw new Error("Hotel name and city are required.");
+    }
+
+    const duplicate = this.state.hotels.find(
+      (hotel) =>
+        hotel.name.toLocaleLowerCase("ru-RU") ===
+          normalizedName.toLocaleLowerCase("ru-RU") &&
+        hotel.city.toLocaleLowerCase("ru-RU") ===
+          normalizedCity.toLocaleLowerCase("ru-RU")
+    );
+    if (duplicate) {
+      return duplicate;
+    }
+
+    const now = new Date().toISOString();
+    const hotel: Hotel = {
+      id: `hotel-${slugify(normalizedName)}-${slugify(normalizedCity)}-${Date.now()
+        .toString()
+        .slice(-5)}`,
+      name: normalizedName,
+      city: normalizedCity,
+      country: (request.country || "Russia").trim(),
+      brand: (request.brand || "Independent").trim(),
+      category: (request.category || "4*").trim(),
+      address: (request.address || `${normalizedCity}, ${request.country || "Russia"}`).trim(),
+      description:
+        (request.description ||
+          "Hotel profile created by user. Analytics will be generated after data ingestion.").trim(),
+      createdAt: now,
+      updatedAt: now
+    };
+    this.state.hotels = [hotel, ...this.state.hotels];
+    return hotel;
   }
 
   getHotelById(hotelId: string): Hotel | undefined {
@@ -97,6 +137,27 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
     };
   }
 
+  createRun(run: AnalysisRun): void {
+    this.state.runs = [run, ...this.state.runs.filter((item) => item.id !== run.id)];
+  }
+
+  updateRun(runId: string, patch: Partial<AnalysisRun>): AnalysisRun | undefined {
+    const index = this.state.runs.findIndex((run) => run.id === runId);
+    if (index === -1) {
+      return undefined;
+    }
+    const updated: AnalysisRun = {
+      ...this.state.runs[index],
+      ...patch
+    };
+    this.state.runs[index] = updated;
+    return updated;
+  }
+
+  getRunById(runId: string): AnalysisRun | undefined {
+    return this.state.runs.find((run) => run.id === runId);
+  }
+
   upsertAnalytics(
     hotelId: string,
     reviews: Review[],
@@ -123,7 +184,7 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
     this.state.analyses = [...preservedAnalyses, ...analyses];
     this.state.aggregates = [...preservedAggregates, aggregate];
     this.state.recommendations = [...preservedRecommendations, ...recommendations];
-    this.state.runs = [run, ...this.state.runs];
+    this.state.runs = [run, ...this.state.runs.filter((item) => item.id !== run.id)];
   }
 
   getSnapshot(): RepositorySnapshot {
@@ -150,6 +211,14 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
       this.state.runs.push(outcome.run);
     });
   }
+}
+
+function slugify(value: string): string {
+  return value
+    .toLocaleLowerCase("ru-RU")
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 30);
 }
 
 function applyReviewFilters(
@@ -202,3 +271,4 @@ function applyReviewFilters(
   }
   return true;
 }
+

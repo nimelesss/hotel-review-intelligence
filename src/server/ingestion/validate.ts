@@ -11,7 +11,9 @@ const SOURCES: ReviewSource[] = [
   "tripadvisor",
   "yandex",
   "manual_upload",
-  "mock_api"
+  "mock_api",
+  "google_places",
+  "apify_dataset"
 ];
 
 export interface ValidationResult {

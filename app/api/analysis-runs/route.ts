@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as IngestionImportRequest;
     if (!body.payload || !body.fileType || !body.sourceType) {
       return NextResponse.json(
-        { message: "payload, fileType и sourceType обязательны." },
+        { message: "payload, fileType and sourceType are required." },
         { status: 400 }
       );
     }

@@ -60,7 +60,9 @@ export type ReviewSource =
   | "ostrovok"
   | "tripadvisor"
   | "manual_upload"
-  | "mock_api";
+  | "mock_api"
+  | "google_places"
+  | "apify_dataset";
 
 export interface Review {
   id: UUID;
@@ -193,7 +195,13 @@ export type AnalysisRunStatus =
   | "completed"
   | "failed";
 
-export type AnalysisRunSourceType = "csv" | "json" | "seed" | "mock_api";
+export type AnalysisRunSourceType =
+  | "csv"
+  | "json"
+  | "seed"
+  | "mock_api"
+  | "platform_api";
+export type PlatformProvider = "google_places" | "apify_dataset";
 
 export interface AnalysisRun {
   id: UUID;
@@ -205,6 +213,11 @@ export interface AnalysisRun {
   completedAt?: string;
   analysisVersion: string;
   notes?: string;
+  progressPct?: number;
+  stage?: string;
+  errorMessage?: string;
+  fetchedReviews?: number;
+  provider?: PlatformProvider;
 }
 
 export interface ExecutiveSummary {
@@ -294,4 +307,23 @@ export interface IngestionImportRequest {
   sourceType: AnalysisRunSourceType;
   payload: string;
   fileType: "csv" | "json";
+}
+
+export interface CreateHotelRequest {
+  name: string;
+  city: string;
+  country: string;
+  brand?: string;
+  category?: string;
+  address?: string;
+  description?: string;
+}
+
+export interface PlatformIngestionRequest {
+  hotelId: string;
+  provider: PlatformProvider;
+  query?: string;
+  language?: string;
+  limit?: number;
+  apifyDatasetUrl?: string;
 }

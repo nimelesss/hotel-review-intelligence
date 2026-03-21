@@ -1,18 +1,23 @@
 import {
   AnalysisRun,
+  CreateHotelRequest,
   DashboardPayload,
   ExecutiveSummary,
   IngestionImportRequest,
   IngestionPreviewResult,
+  PlatformIngestionRequest,
   RecommendationPayload,
   SegmentAnalyticsPayload,
   SentimentLabel
 } from "@/entities/types";
-import { DEFAULT_HOTEL_ID } from "@/shared/config/constants";
+import { ANALYSIS_VERSION, DEFAULT_HOTEL_ID } from "@/shared/config/constants";
 import { SEGMENT_LABELS } from "@/shared/config/taxonomy";
 import { buildIngestionPreview, normalizeForImport } from "@/server/ingestion/pipeline";
+import { normalizeRows } from "@/server/ingestion/normalize";
 import { runAnalysisForHotel } from "@/server/analytics/run-analysis";
 import { getRepository } from "@/server/repositories";
+import { createId } from "@/shared/lib/id";
+import { fetchPlatformReviews } from "@/server/platform-fetch";
 
 export function resolveHotelId(candidate?: string): string {
   const repository = getRepository();
@@ -33,7 +38,7 @@ export function getDashboardPayload(hotelIdRaw?: string): DashboardPayload {
   if (!hotel) {
     throw new Error("Hotel not found");
   }
-  const aggregate = repository.getAggregateByHotel(hotelId);
+  const aggregate = ensureHotelAnalytics(hotelId);
   if (!aggregate) {
     throw new Error("Aggregate not found");
   }
@@ -58,7 +63,7 @@ export function getSegmentPayload(hotelIdRaw?: string): SegmentAnalyticsPayload 
   const repository = getRepository();
   const hotelId = resolveHotelId(hotelIdRaw);
   const hotel = repository.getHotelById(hotelId);
-  const aggregate = repository.getAggregateByHotel(hotelId);
+  const aggregate = ensureHotelAnalytics(hotelId);
   if (!hotel || !aggregate) {
     throw new Error("Segment data not found");
   }
@@ -68,9 +73,9 @@ export function getSegmentPayload(hotelIdRaw?: string): SegmentAnalyticsPayload 
     segmentDistribution: aggregate.segmentDistribution,
     segmentInsights: aggregate.segmentInsights,
     markerNotes: [
-      "Сегментация вероятностная: каждый отзыв получает веса по нескольким сегментам.",
-      "Primary segment назначается только при достаточной уверенности.",
-      "При низком разрыве между лидирующими сегментами используется класс mixed."
+      "Segmentation is probabilistic: one review can score across multiple segments.",
+      "Primary segment is assigned only when confidence is sufficient.",
+      "If top segment scores are too close, the review is marked as mixed."
     ]
   };
 }
@@ -84,6 +89,7 @@ export function getRecommendationPayload(
   if (!hotel) {
     throw new Error("Hotel not found");
   }
+  ensureHotelAnalytics(hotelId);
   const recommendations = repository.listRecommendationsByHotel(hotelId);
   return {
     hotel,
@@ -140,6 +146,147 @@ export function runIngestionImport(
   };
 }
 
+export function createHotel(request: CreateHotelRequest) {
+  const repository = getRepository();
+  const hotel = repository.createHotel(request);
+  ensureHotelAnalytics(hotel.id);
+  return hotel;
+}
+
+export function startPlatformIngestionRun(request: PlatformIngestionRequest): AnalysisRun {
+  const repository = getRepository();
+  const hotelId = resolveHotelId(request.hotelId);
+  const hotel = repository.getHotelById(hotelId);
+  if (!hotel) {
+    throw new Error("Hotel not found");
+  }
+
+  const runId = createId("run-platform");
+  const initialRun: AnalysisRun = {
+    id: runId,
+    hotelId,
+    sourceType: "platform_api",
+    totalReviewsProcessed: repository.listReviewsByHotel(hotelId).length,
+    status: "running",
+    startedAt: new Date().toISOString(),
+    analysisVersion: ANALYSIS_VERSION,
+    stage: "fetching_reviews",
+    progressPct: 5,
+    notes: "Platform ingestion started.",
+    provider: request.provider,
+    fetchedReviews: 0
+  };
+  repository.createRun(initialRun);
+
+  void executePlatformIngestion(runId, request).catch(() => {
+    // errors are handled inside executePlatformIngestion
+  });
+
+  return initialRun;
+}
+
+async function executePlatformIngestion(
+  runId: string,
+  request: PlatformIngestionRequest
+): Promise<void> {
+  const repository = getRepository();
+  const run = repository.getRunById(runId);
+  if (!run) {
+    return;
+  }
+  const hotel = repository.getHotelById(run.hotelId);
+  if (!hotel) {
+    repository.updateRun(runId, {
+      status: "failed",
+      stage: "failed",
+      progressPct: 100,
+      completedAt: new Date().toISOString(),
+      errorMessage: "Hotel not found for processing."
+    });
+    return;
+  }
+
+  try {
+    repository.updateRun(runId, {
+      stage: "fetching_reviews",
+      progressPct: 12
+    });
+
+    const platformResult = await fetchPlatformReviews({
+      provider: request.provider,
+      hotel,
+      query: request.query,
+      limit: request.limit,
+      language: request.language,
+      apifyDatasetUrl: request.apifyDatasetUrl
+    });
+
+    const existingReviews = repository.listReviewsByHotel(hotel.id);
+    const normalized = normalizeRows(hotel.id, platformResult.rows, existingReviews);
+    const mergedReviews = [...existingReviews, ...normalized.normalized];
+
+    repository.updateRun(runId, {
+      stage: "analyzing_reviews",
+      progressPct: 58,
+      fetchedReviews: normalized.normalized.length,
+      notes: platformResult.notes.join(" ")
+    });
+
+    const outcome = runAnalysisForHotel(hotel.id, mergedReviews, "platform_api");
+
+    const completedRun: AnalysisRun = {
+      ...outcome.run,
+      id: runId,
+      startedAt: run.startedAt,
+      status: "completed",
+      progressPct: 100,
+      stage: "completed",
+      provider: request.provider,
+      fetchedReviews: normalized.normalized.length,
+      notes:
+        `${platformResult.notes.join(" ")} Duplicates skipped: ${normalized.duplicates}.` +
+        ` Total reviews in storage: ${mergedReviews.length}.`
+    };
+
+    repository.upsertAnalytics(
+      hotel.id,
+      mergedReviews,
+      outcome.analyses,
+      outcome.aggregate,
+      outcome.recommendations,
+      completedRun
+    );
+  } catch (error) {
+    repository.updateRun(runId, {
+      status: "failed",
+      stage: "failed",
+      progressPct: 100,
+      completedAt: new Date().toISOString(),
+      errorMessage: error instanceof Error ? error.message : "Platform run failed"
+    });
+  }
+}
+
+function ensureHotelAnalytics(hotelId: string) {
+  const repository = getRepository();
+  const existing = repository.getAggregateByHotel(hotelId);
+  if (existing) {
+    return existing;
+  }
+
+  const currentReviews = repository.listReviewsByHotel(hotelId);
+  const outcome = runAnalysisForHotel(hotelId, currentReviews, "seed");
+  repository.upsertAnalytics(
+    hotelId,
+    currentReviews,
+    outcome.analyses,
+    outcome.aggregate,
+    outcome.recommendations,
+    outcome.run
+  );
+  return repository.getAggregateByHotel(hotelId);
+}
+
 function buildExecutiveSummary(
   aggregate: DashboardPayload["aggregate"]
 ): ExecutiveSummary {
@@ -147,22 +294,22 @@ function buildExecutiveSummary(
   const keyInsight =
     aggregate.positiveDrivers[0] &&
     aggregate.segmentDistribution[0] &&
-    `Сильная тема "${aggregate.positiveDrivers[0].label}" поддерживает сегмент "${SEGMENT_LABELS[aggregate.segmentDistribution[0].id]}".`;
+    `Strong theme "${aggregate.positiveDrivers[0].label}" supports segment "${SEGMENT_LABELS[aggregate.segmentDistribution[0].id]}".`;
   const keyRisk =
     aggregate.keyRisks[0] ??
     (aggregate.negativeDrivers[0]
-      ? `Требует внимания: ${aggregate.negativeDrivers[0].label}.`
-      : "Явные критичные риски не выявлены.");
+      ? `Needs attention: ${aggregate.negativeDrivers[0].label}.`
+      : "No critical risk detected at current sample size.");
   const keyOpportunity =
     aggregate.growthOpportunities[0] ??
-    "Есть потенциал роста через усиление подтвержденных преимуществ в коммуникациях.";
+    "Growth opportunity exists via stronger communication of proven strengths.";
 
   return {
     averageRating: aggregate.averageRating,
     totalReviews: aggregate.totalReviews,
     overallSentimentLabel,
     dominantSegment: aggregate.dominantSegment,
-    keyInsight: keyInsight ?? "Данных недостаточно для выраженного ключевого вывода.",
+    keyInsight: keyInsight ?? "Not enough data for a strong executive conclusion.",
     keyRisk,
     keyOpportunity
   };

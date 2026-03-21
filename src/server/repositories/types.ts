@@ -1,5 +1,6 @@
 import {
   AnalysisRun,
+  CreateHotelRequest,
   DashboardPayload,
   Hotel,
   HotelAggregate,
@@ -22,6 +23,7 @@ export interface RepositorySnapshot {
 
 export interface IntelligenceRepository {
   listHotels(): Hotel[];
+  createHotel(request: CreateHotelRequest): Hotel;
   getHotelById(hotelId: string): Hotel | undefined;
   listReviewsByHotel(hotelId: string): Review[];
   listAnalysesByHotel(hotelId: string): ReviewAnalysis[];
@@ -29,6 +31,9 @@ export interface IntelligenceRepository {
   listRecommendationsByHotel(hotelId: string): Recommendation[];
   listRunsByHotel(hotelId: string): AnalysisRun[];
   queryReviews(query: ReviewsQuery): ReviewsQueryResult;
+  createRun(run: AnalysisRun): void;
+  updateRun(runId: string, patch: Partial<AnalysisRun>): AnalysisRun | undefined;
+  getRunById(runId: string): AnalysisRun | undefined;
   upsertAnalytics(
     hotelId: string,
     reviews: Review[],

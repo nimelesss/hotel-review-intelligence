@@ -82,7 +82,9 @@ function normalizeSource(value?: string): ReviewSource {
     "tripadvisor",
     "yandex",
     "manual_upload",
-    "mock_api"
+    "mock_api",
+    "google_places",
+    "apify_dataset"
   ];
   return known.includes(source as ReviewSource)
     ? (source as ReviewSource)
