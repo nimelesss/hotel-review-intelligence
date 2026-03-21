@@ -1,73 +1,78 @@
 # Hotel Review Intelligence
 
-B2B SaaS foundation для управленческой аналитики отзывов в гостиничном бизнесе.
+B2B SaaS foundation for hotel management analytics from guest reviews.
 
-## Что реализовано в MVP
-- Full product architecture (см. `docs/product-architecture.md`).
-- Next.js + TypeScript + Tailwind проектная основа.
-- Доменная модель: Hotel, Review, ReviewAnalysis, HotelAggregate, Recommendation, AnalysisRun.
-- Explainable analytics engine:
-  - preprocessing,
-  - sentiment scoring,
-  - topic detection,
-  - probabilistic segment scoring,
-  - confidence и explanation markers.
-- Rule-based recommendation engine.
-- Ingestion flow:
-  - CSV/JSON payload,
-  - validation,
-  - normalization,
-  - dedupe,
-  - import + analysis run.
-- Platform ingestion:
-  - Google Places API connector (real reviews, requires API key),
-  - Apify Dataset connector (high-volume multi-platform imports).
-- Hotel creation flow:
-  - можно создать любой отель прямо из UI (не только seed).
-- Async processing UX:
-  - run statuses (running/completed/failed),
-  - progress/stage updates,
-  - animated processing panel.
-- API layer.
-- UI pages:
-  - Dashboard,
-  - Review Explorer,
-  - Segment Analysis,
-  - Recommendations,
-  - Methodology,
-  - Upload / Analysis Run.
+## MVP Includes
+- Next.js + TypeScript + Tailwind product shell
+- Domain model: `Hotel`, `Review`, `ReviewAnalysis`, `HotelAggregate`, `Recommendation`, `AnalysisRun`
+- Explainable analytics:
+  - text preprocessing
+  - sentiment scoring
+  - topic detection
+  - probabilistic segment scoring
+  - confidence + explanation markers
+- Rule-based recommendation engine
+- Ingestion pipeline:
+  - upload (`csv` / `json`)
+  - validation
+  - normalization
+  - dedupe
+  - import + analysis run
+- Async platform runs with progress stages and animated processing UI
+- Runtime persistence for created hotels/reviews/runs (`.runtime-store.json`)
 
-## Быстрый старт
-Требуется Node.js 20+.
+## Real Review Sources (RF-focused)
+Platform ingestion is configured for Russian ecosystems:
+- `yandex_maps_dataset`
+- `two_gis_dataset`
+- `russian_travel_dataset` (mixed local aggregators)
+
+These connectors accept dataset/export URL with paginated JSON items.  
+Typical format:
+
+```text
+https://api.apify.com/v2/datasets/<dataset-id>/items?token=<token>
+```
+
+You can also use your own JSON export endpoint if it returns array-based review records.
+
+## Quick Start
+Requires Node.js 20+.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Приложение: `http://localhost:3000`.
+Open: `http://localhost:3000`
 
-## Переменные окружения (для real-source ingestion)
-Создайте `.env.local`:
+## Main Pages
+- `/` Dashboard
+- `/reviews` Review Explorer
+- `/segments` Segment Analysis
+- `/recommendations` Recommendations
+- `/methodology` Methodology
+- `/upload` Data Upload + Analysis Run
 
-```bash
-GOOGLE_PLACES_API_KEY=your_google_places_key
-```
+## Deployment
+Project contains GitHub Actions workflow for VPS deployment:
+- `.github/workflows/deploy.yml`
 
-Для Apify bulk-ingestion передавайте dataset URL в UI:
-`https://api.apify.com/v2/datasets/<dataset-id>/items?token=<token>`
+Expected server app URL example:
+- `http://<server-ip>:3100`
 
-## Структура
-- `app/` - маршруты и API route handlers.
-- `src/server/analytics/` - explainable analytics engine.
-- `src/server/ingestion/` - upload pipeline.
-- `src/server/repositories/` - repository abstraction + in-memory adapter.
-- `src/features/` - экранные модули приложения.
-- `src/shared/` - UI kit, utils, taxonomy/config.
-- `src/data/seeds/` - стартовые данные.
-- `docs/product-architecture.md` - продуктово-техническая структура A-Q.
+## Project Structure
+- `app/` routes + API handlers
+- `src/features/` page-level modules
+- `src/shared/` UI kit, utils, config
+- `src/server/analytics/` explainable analytics engine
+- `src/server/ingestion/` ingestion pipeline
+- `src/server/platform-fetch/` external source connectors
+- `src/server/repositories/` repository abstraction + adapters
+- `src/data/seeds/` seed data
+- `docs/product-architecture.md` architecture spec
 
-## Ограничения MVP
-- Хранилище in-memory (готово к замене на PostgreSQL repository).
-- Авторизация/RBAC не включены в текущий этап.
-- UI upload использует textarea-поток для ускорения MVP, в V1 добавляется файловый upload и фоновые задачи.
+## Current MVP Limits
+- Default storage is in-memory + runtime JSON snapshot
+- No RBAC/auth in MVP
+- Upload UI currently uses text payload input (file picker planned in V1)
