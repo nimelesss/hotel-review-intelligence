@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
 import { getDashboardPayload } from "@/server/services/intelligence.service";
 
-interface Params {
-  params: { hotelId: string };
-}
-
-export async function GET(_: Request, { params }: Params) {
+export async function GET(_: Request, context: any) {
   try {
+    const params = context?.params ?? {};
     const { hotelId } = params;
     const payload = getDashboardPayload(hotelId);
     return NextResponse.json(payload);
