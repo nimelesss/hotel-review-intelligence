@@ -422,12 +422,6 @@ function readPortfolioTargets(): PortfolioTarget[] {
 
     const datasetUrl = normalizeOptional(target.datasetUrl);
     const datasetUrlTemplate = normalizeOptional(target.datasetUrlTemplate);
-    if (!datasetUrl && !datasetUrlTemplate && !canFetchWithoutDatasetUrl(provider)) {
-      throw new Error(
-        `Источник #${index + 1}: укажите datasetUrl/datasetUrlTemplate или настройте runtime collector для ${provider}.`
-      );
-    }
-
     if (!normalizeOptional(target.hotelId) && !normalizeOptional(target.hotelName)) {
       throw new Error(
         `Источник #${index + 1}: укажите hotelId или hotelName для сопоставления отеля.`
@@ -465,12 +459,6 @@ function readFallbackTargets(): FallbackTarget[] {
 
     const datasetUrl = normalizeOptional(target.datasetUrl);
     const datasetUrlTemplate = normalizeOptional(target.datasetUrlTemplate);
-    if (!datasetUrl && !datasetUrlTemplate && !canFetchWithoutDatasetUrl(provider)) {
-      throw new Error(
-        `Fallback-источник #${index + 1}: укажите datasetUrl/datasetUrlTemplate или настройте runtime collector для ${provider}.`
-      );
-    }
-
     return {
       provider,
       datasetUrl,
