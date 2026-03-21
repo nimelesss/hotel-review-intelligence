@@ -13,10 +13,12 @@ interface CacheFilePayload {
 const DEFAULT_CACHE_LIMIT = 50_000;
 const DEFAULT_MEMORY_TTL_MS = 60_000;
 const DEFAULT_INCLUDE_SEED_CATALOG = false;
+const REMOTE_HYDRATE_RETRY_MS = 5 * 60 * 1000;
 
 let memoryCache: HotelSearchResult[] | null = null;
 let memoryLoadedAt = 0;
 let remoteCatalogHydrated = false;
+let remoteCatalogHydrationErrorAt = 0;
 
 function getCachePath(): string {
   return process.env.HOTEL_SEARCH_CACHE_PATH || path.join(process.cwd(), ".hotel-search-cache.json");
@@ -165,8 +167,9 @@ function loadCache(): HotelSearchResult[] {
     return memoryCache;
   }
 
-  const fromDisk = readCacheFromDisk();
-  const seedItems = shouldIncludeSeedCatalog() ? seedHotelSearchCatalog : [];
+  const includeSeed = shouldIncludeSeedCatalog();
+  const fromDisk = readCacheFromDisk().filter((item) => (includeSeed ? true : !isSeedItem(item)));
+  const seedItems = includeSeed ? seedHotelSearchCatalog : [];
   const merged = mergeUnique([...seedItems, ...fromDisk]).slice(0, getCacheLimit());
 
   memoryCache = merged;
@@ -189,6 +192,12 @@ export async function hydrateHotelCatalogFromRemoteSource(): Promise<void> {
   if (remoteCatalogHydrated) {
     return;
   }
+  if (
+    remoteCatalogHydrationErrorAt > 0 &&
+    Date.now() - remoteCatalogHydrationErrorAt < REMOTE_HYDRATE_RETRY_MS
+  ) {
+    return;
+  }
 
   const hasSource =
     !!process.env.RUSSIA_HOTELS_CATALOG_URL?.trim() ||
@@ -198,21 +207,30 @@ export async function hydrateHotelCatalogFromRemoteSource(): Promise<void> {
     return;
   }
 
-  const loaded = await loadRussiaHotelsCatalog(getCacheLimit());
-  const imported = loaded.records
-    .map((item) =>
-      sanitizeCatalogItem({
-        ...item,
-        source: "catalog_import"
-      })
-    )
-    .filter((item): item is HotelSearchResult => !!item);
+  try {
+    const loaded = await loadRussiaHotelsCatalog(getCacheLimit());
+    const imported = loaded.records
+      .map((item) =>
+        sanitizeCatalogItem({
+          ...item,
+          source: "catalog_import"
+        })
+      )
+      .filter((item): item is HotelSearchResult => !!item);
 
-  if (imported.length) {
-    upsertHotelCatalog(imported);
+    if (imported.length) {
+      upsertHotelCatalog(imported);
+    }
+    remoteCatalogHydrated = true;
+    remoteCatalogHydrationErrorAt = 0;
+  } catch (error) {
+    remoteCatalogHydrationErrorAt = Date.now();
+    console.warn(
+      `[hotel-search] remote catalog hydration skipped: ${
+        error instanceof Error ? error.message : "unknown error"
+      }`
+    );
   }
-
-  remoteCatalogHydrated = true;
 }
 
 export function searchHotelCatalog(query: string, limit: number): HotelSearchResult[] {
@@ -272,4 +290,8 @@ function sanitizeCatalogItem(item: HotelSearchResult): HotelSearchResult | null 
     coordinates: item.coordinates,
     source: item.source || "catalog_import"
   };
+}
+
+function isSeedItem(item: HotelSearchResult): boolean {
+  return item.source === "catalog_seed" || item.externalId.startsWith("seed-");
 }
