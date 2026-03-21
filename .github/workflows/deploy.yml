@@ -24,25 +24,10 @@ jobs:
           script_stop: true
           command_timeout: 18m
           script: |
-            set -euo pipefail
-            exec 9>/tmp/hri-deploy.lock
-            flock -w 120 9
+            set -eu
             cd /srv/hotel-review-intelligence
             git fetch origin main
             git checkout -B main origin/main
-
-            if [ -f /etc/hotel-review-intelligence.env ]; then
-              while IFS= read -r line || [ -n "$line" ]; do
-                case "$line" in
-                  ""|\#*) continue ;;
-                esac
-                key="${line%%=*}"
-                value="${line#*=}"
-                export "$key=$value"
-              done < /etc/hotel-review-intelligence.env
-            fi
-
-            node -e 'const vars=["DEFAULT_REALTIME_TARGETS_JSON","PORTFOLIO_SYNC_TARGETS_JSON"]; for (const n of vars){const v=process.env[n]; if(!v) continue; try{JSON.parse(v);} catch(e){console.warn(`Warning: invalid JSON in ${n}: ${e.message}. Deploy continues, but sync endpoints may fail until env is fixed.`);}}'
 
             rm -rf .next
             timeout 10m npm ci --no-audit --no-fund
