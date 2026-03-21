@@ -67,8 +67,16 @@ export function DashboardPage() {
       try {
         const response = await fetchJson<HotelListResponse>("/api/hotels");
         setHotels(response.items);
-        if (response.items.length > 0) {
-          setSelectedHotelId((prev) => prev || response.items[0].id);
+        setSelectedHotelId((prev) => {
+          if (!response.items.length) {
+            return "";
+          }
+          const prevExists = response.items.some((hotel) => hotel.id === prev);
+          return prevExists ? prev : response.items[0].id;
+        });
+        if (!response.items.length) {
+          setDashboard(null);
+          setError(null);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Не удалось загрузить список отелей.");
@@ -91,7 +99,15 @@ export function DashboardPage() {
         );
         setDashboard(payload);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Не удалось загрузить сводку по отелю.");
+        const message =
+          err instanceof Error ? err.message : "Не удалось загрузить сводку по отелю.";
+        if (message.toLocaleLowerCase("ru-RU").includes("отель не найден")) {
+          setSelectedHotelId("");
+          setDashboard(null);
+          setError(null);
+          return;
+        }
+        setError(message);
       } finally {
         setLoading(false);
       }
