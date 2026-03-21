@@ -97,6 +97,16 @@ const CITY_ALIASES: Record<string, string[]> = {
   "уфа": ["ufa"]
 };
 
+const BRAND_ALIASES: Record<string, string[]> = {
+  courtyard: ["кортъярд"],
+  marriott: ["марриотт", "мариотт"],
+  hilton: ["хилтон"],
+  radisson: ["радиссон"],
+  ibis: ["ибис"],
+  novotel: ["новотель"],
+  mercure: ["меркюр"]
+};
+
 const ADDRESS_ADMIN_WORDS = [
   "район",
   "область",
@@ -229,6 +239,7 @@ function buildQueryVariants(input: string): string[] {
   }
 
   expandCityAliases(query).forEach((variant) => variants.add(variant));
+  expandBrandAliases(query).forEach((variant) => variants.add(variant));
 
   return [...variants];
 }
@@ -258,6 +269,34 @@ function expandCityAliases(query: string): string[] {
   });
 
   return [...results];
+}
+
+function expandBrandAliases(query: string): string[] {
+  const normalized = normalize(query);
+  const variants = new Set<string>();
+
+  Object.entries(BRAND_ALIASES).forEach(([latinBrand, aliases]) => {
+    if (normalized.includes(latinBrand)) {
+      aliases.forEach((alias) => {
+        const replaced = replaceInsensitive(query, latinBrand, alias);
+        if (replaced) {
+          variants.add(replaced);
+        }
+      });
+    }
+
+    aliases.forEach((alias) => {
+      const normalizedAlias = normalize(alias);
+      if (normalized.includes(normalizedAlias)) {
+        const replaced = replaceInsensitive(query, alias, latinBrand);
+        if (replaced) {
+          variants.add(replaced);
+        }
+      }
+    });
+  });
+
+  return [...variants];
 }
 
 function replaceInsensitive(input: string, needle: string, replacement: string): string {
@@ -526,13 +565,10 @@ function dedupeStringList(values: string[]): string[] {
 function buildResultDedupKey(item: HotelSearchResult): string {
   const normalizedName = normalize(stripCitySuffix(item.name, item.city));
   const normalizedCity = normalize(item.city);
-  const normalizedAddress = normalize(simplifyAddress(item.address, item.city, item.country));
-
-  if (!normalizedAddress) {
-    return `${normalizedName}|${normalizedCity}`;
-  }
-
-  return `${normalizedName}|${normalizedCity}|${normalizedAddress}`;
+  const coordinatesKey = item.coordinates
+    ? `${item.coordinates.lat.toFixed(3)}|${item.coordinates.lon.toFixed(3)}`
+    : "";
+  return `${normalizedName}|${normalizedCity}|${coordinatesKey}`;
 }
 
 function stripCitySuffix(name: string, city: string): string {

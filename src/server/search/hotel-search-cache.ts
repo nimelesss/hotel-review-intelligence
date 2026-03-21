@@ -67,9 +67,10 @@ function shouldIncludeSeedCatalog(): boolean {
 function signature(item: HotelSearchResult): string {
   const normalizedName = normalize(stripCitySuffix(item.name, item.city));
   const normalizedCity = normalize(item.city);
-  const normalizedAddress = normalize(compactAddress(item.address, item.city, item.country));
-  const externalPart = item.externalId ? item.externalId.trim() : "";
-  return `name:${normalizedName}|city:${normalizedCity}|addr:${normalizedAddress}|ext:${externalPart}`;
+  const coordinatesKey = item.coordinates
+    ? `${item.coordinates.lat.toFixed(3)}|${item.coordinates.lon.toFixed(3)}`
+    : "";
+  return `name:${normalizedName}|city:${normalizedCity}|geo:${coordinatesKey}`;
 }
 
 function scoreCandidate(item: HotelSearchResult, query: string): number {
