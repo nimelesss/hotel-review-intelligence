@@ -21,10 +21,7 @@ interface RecommendationSeed {
   effortScore: number;
 }
 
-export function buildRecommendations(
-  hotelId: string,
-  aggregate: HotelAggregate
-): Recommendation[] {
+export function buildRecommendations(hotelId: string, aggregate: HotelAggregate): Recommendation[] {
   const recommendations: RecommendationSeed[] = [];
 
   const businessSegment = aggregate.segmentDistribution.find(
@@ -37,11 +34,11 @@ export function buildRecommendations(
     recommendations.push({
       category: "marketing",
       priority: "high",
-      title: "Усилить позиционирование под бизнес-гостей",
+      title: "Усилить позиционирование для бизнес-гостей",
       description:
-        "Сфокусировать коммуникацию на факторах, которые бизнес-сегмент стабильно оценивает высоко.",
+        "Сфокусировать коммерческие сообщения на преимуществах, которые бизнес-аудитория стабильно оценивает высоко.",
       rationale:
-        "Высокая доля business traveler + подтвержденные позитивные драйверы по Wi-Fi/расположению.",
+        "Высокая доля бизнес-гостей и сильные позитивные сигналы по Wi-Fi/расположению.",
       relatedSegments: ["business_traveler"],
       relatedTopics: ["wifi", "location", "business_infrastructure"],
       impactScore: 8.8,
@@ -54,11 +51,11 @@ export function buildRecommendations(
     recommendations.push({
       category: "operations",
       priority: "high",
-      title: "Оптимизировать check-in/check-out процесс",
+      title: "Оптимизировать процессы заселения и выезда",
       description:
-        "Сократить время регистрации и очередь в пиковые часы, внедрить fast-lane для повторных гостей.",
+        "Сократить очереди и время регистрации в часы пик, добавить быстрый сценарий для повторных гостей.",
       rationale:
-        "Тема заселения входит в топ негативных драйверов и влияет на оценку первых впечатлений.",
+        "Тема check-in/check-out входит в ключевые негативные драйверы и влияет на первое впечатление.",
       relatedSegments: ["business_traveler", "transit_guest"],
       relatedTopics: ["checkin_checkout", "service"],
       impactScore: 9.1,
@@ -67,17 +64,16 @@ export function buildRecommendations(
   }
 
   const parkingMixed =
-    aggregate.topicDistribution.find((topic) => topic.topic === "parking")?.riskLevel !==
-    "low";
+    aggregate.topicDistribution.find((topic) => topic.topic === "parking")?.riskLevel !== "low";
   if (parkingMixed) {
     recommendations.push({
       category: "operations",
       priority: "medium",
-      title: "Стабилизировать опыт парковки и коммуникацию",
+      title: "Стабилизировать клиентский путь по парковке",
       description:
-        "Добавить навигацию, прозрачные правила доступа и предзаказ места при высокой загрузке.",
+        "Уточнить навигацию, правила доступа и сценарий на период высокой загрузки парковки.",
       rationale:
-        "Парковка часто упоминается и имеет mixed/negative сигналы в части отзывов.",
+        "Тема парковки часто упоминается и имеет смешанный или негативный профиль.",
       relatedSegments: ["transit_guest", "family", "business_traveler"],
       relatedTopics: ["parking", "location"],
       impactScore: 7.4,
@@ -91,11 +87,11 @@ export function buildRecommendations(
     recommendations.push({
       category: "marketing",
       priority: "medium",
-      title: "Вынести темы чистоты и сервиса в коммерческие сообщения",
+      title: "Усилить коммуникацию сильных сторон сервиса",
       description:
-        "Обновить карточки объекта, рекламные креативы и сайт акцентом на подтвержденные преимущества.",
+        "Вывести темы чистоты и сервиса в карточки отеля, рекламные материалы и бренд-коммуникацию.",
       rationale:
-        "Стабильно позитивные темы повышают лояльность, но часто недоиспользуются в маркетинге.",
+        "Стабильно позитивные сигналы по чистоте и сервису повышают лояльность, но часто недоиспользуются в маркетинге.",
       relatedSegments: ["business_traveler", "family", "couple"],
       relatedTopics: ["cleanliness", "service", "staff"],
       impactScore: 8,
@@ -107,9 +103,9 @@ export function buildRecommendations(
     recommendations.push({
       category: "reputation",
       priority: "high",
-      title: "Запустить недельный цикл антикризисного мониторинга",
+      title: "Ввести недельный контур репутационного контроля",
       description:
-        "Контролировать risk-темы ежедневно, эскалировать инциденты и отслеживать динамику после мер.",
+        "Поставить риск-темы на регулярный контроль и отслеживать динамику после корректирующих действий.",
       rationale: `Зафиксированы риск-сигналы: ${aggregate.keyRisks.slice(0, 2).join("; ")}.`,
       relatedSegments: ["mixed", "unclassified"],
       relatedTopics: aggregate.negativeDrivers.slice(0, 3).map((driver) => driver.topic),
@@ -122,11 +118,11 @@ export function buildRecommendations(
     recommendations.push({
       category: "strategy",
       priority: "medium",
-      title: "Расширить выборку и стабилизировать сигналы",
+      title: "Увеличить объем отзывов и частоту обновления",
       description:
-        "Для устойчивых управленческих выводов увеличьте объем отзывов и частоту анализа.",
+        "Для более устойчивых выводов расширьте сбор отзывов и зафиксируйте регулярный цикл анализа.",
       rationale:
-        "Текущая выборка не дает выраженных критичных драйверов, необходимо наращивать данные.",
+        "Текущая выборка не содержит выраженных критичных драйверов, необходима дополнительная статистика.",
       relatedSegments: ["unclassified"],
       relatedTopics: [],
       impactScore: 6.1,
@@ -163,7 +159,6 @@ function hasNegativeDriver(drivers: DriverItem[], topic: TopicId): boolean {
 }
 
 function scorePriority(rec: { priority: RecommendationPriority; impactScore: number }): number {
-  const priorityWeight =
-    rec.priority === "high" ? 3 : rec.priority === "medium" ? 2 : 1;
+  const priorityWeight = rec.priority === "high" ? 3 : rec.priority === "medium" ? 2 : 1;
   return priorityWeight * 10 + rec.impactScore;
 }

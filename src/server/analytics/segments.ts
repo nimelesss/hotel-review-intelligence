@@ -47,17 +47,20 @@ export function scoreSegments(input: SegmentScoringInput): SegmentScoringResult 
 
   if (input.stayTypeRaw) {
     const lowered = input.stayTypeRaw.toLocaleLowerCase("ru-RU");
-    if (lowered.includes("business")) {
+    if (lowered.includes("business") || lowered.includes("командир")) {
       rawScores.business_traveler += 1.2;
     }
-    if (lowered.includes("family")) {
+    if (lowered.includes("family") || lowered.includes("сем")) {
       rawScores.family += 1.2;
     }
-    if (lowered.includes("couple")) {
+    if (lowered.includes("couple") || lowered.includes("пара")) {
       rawScores.couple += 1;
     }
-    if (lowered.includes("solo")) {
+    if (lowered.includes("solo") || lowered.includes("один")) {
       rawScores.solo_traveler += 1.1;
+    }
+    if (lowered.includes("transit") || lowered.includes("транзит")) {
+      rawScores.transit_guest += 1.1;
     }
   }
 
@@ -91,15 +94,12 @@ export function scoreSegments(input: SegmentScoringInput): SegmentScoringResult 
     segmentScores: finalScores,
     primarySegment,
     confidence,
-    matchedMarkers: unique(matchedMarkers).slice(0, 8),
+    matchedMarkers: unique(matchedMarkers).slice(0, 10),
     rationale: buildRationale(primarySegment, confidence, top?.score ?? 0, confidenceGap)
   };
 }
 
-function ratingBiasAdjust(
-  scores: Record<SegmentId, number>,
-  rating: number
-): Record<SegmentId, number> {
+function ratingBiasAdjust(scores: Record<SegmentId, number>, rating: number): Record<SegmentId, number> {
   const adjusted = { ...scores };
   const ratingNorm = clamp((rating - 3) / 2, -1, 1);
 
@@ -111,13 +111,8 @@ function ratingBiasAdjust(
   return adjusted;
 }
 
-function normalizeScores(
-  scores: Record<SegmentId, number>
-): Record<SegmentId, number> {
-  const total = BASE_SEGMENT_IDS.reduce(
-    (sum, segmentId) => sum + Math.max(scores[segmentId], 0),
-    0
-  );
+function normalizeScores(scores: Record<SegmentId, number>): Record<SegmentId, number> {
+  const total = BASE_SEGMENT_IDS.reduce((sum, segmentId) => sum + Math.max(scores[segmentId], 0), 0);
   const normalized = { ...scores };
 
   if (total <= 0) {
@@ -130,7 +125,6 @@ function normalizeScores(
   BASE_SEGMENT_IDS.forEach((segmentId) => {
     normalized[segmentId] = clamp(scores[segmentId] / total, 0, 1);
   });
-
   return normalized;
 }
 
@@ -141,18 +135,16 @@ function buildRationale(
   confidenceGap: number
 ): string {
   if (primarySegment === "unclassified") {
-    return "Недостаточно маркеров для надежной сегментации. Рекомендуется дополнить контекст отзывов.";
+    return "Недостаточно маркеров для уверенной сегментации. Нужен больший контекст отзывов.";
   }
   if (primarySegment === "mixed") {
-    return `Есть конкурирующие сигналы сегментов (разрыв ${(
+    return `Обнаружены конкурирующие сигналы сегментов (разрыв ${(
       confidenceGap * 100
-    ).toFixed(1)} п.п.), профиль классифицирован как смешанный.`;
+    ).toFixed(1)} п.п.), поэтому профиль отмечен как смешанный.`;
   }
   return `Основной сегмент: ${SEGMENT_LABELS[primarySegment]}. Уверенность ${(
     confidence * 100
-  ).toFixed(1)}%, суммарный относительный вес ${(topScore * 100).toFixed(
-    1
-  )}%.`;
+  ).toFixed(1)}%, относительный вес ${(topScore * 100).toFixed(1)}%.`;
 }
 
 function hasMarker(markerSet: Set<string>, marker: string): boolean {

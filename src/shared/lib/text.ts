@@ -8,7 +8,7 @@ export function toLowerSafe(value: string): string {
 
 export function tokenize(value: string): string[] {
   return value
-    .split(/[^a-zA-Zа-яА-Я0-9-]+/g)
+    .split(/[^a-zA-Zа-яА-ЯёЁ0-9-]+/g)
     .map((token) => token.trim())
     .filter((token) => token.length > 1);
 }

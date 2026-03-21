@@ -1,19 +1,11 @@
-import {
-  Review,
-  ReviewAnalysis,
-  SegmentId,
-  TopicId
-} from "@/entities/types";
+import { Review, ReviewAnalysis, SegmentId, TopicId } from "@/entities/types";
 import { ANALYSIS_VERSION } from "@/shared/config/constants";
 import { createId } from "@/shared/lib/id";
 import { preprocessReviewText } from "@/server/analytics/preprocess";
 import { scoreSentiment } from "@/server/analytics/sentiment";
 import { detectTopics } from "@/server/analytics/topics";
 import { scoreSegments } from "@/server/analytics/segments";
-import {
-  buildExplanations,
-  buildManagerImpact
-} from "@/server/analytics/explainability";
+import { buildExplanations, buildManagerImpact } from "@/server/analytics/explainability";
 import { detectRiskFlags } from "@/server/analytics/rules/risk-rules";
 
 export function analyzeReview(review: Review): ReviewAnalysis {
@@ -111,10 +103,7 @@ function topicToKeyword(topic: TopicId): string {
   return map[topic];
 }
 
-export function getTopSegmentIds(
-  scores: Record<SegmentId, number>,
-  limit = 3
-): SegmentId[] {
+export function getTopSegmentIds(scores: Record<SegmentId, number>, limit = 3): SegmentId[] {
   return (Object.entries(scores) as Array<[SegmentId, number]>)
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)

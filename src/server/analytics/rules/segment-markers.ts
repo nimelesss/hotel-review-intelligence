@@ -31,7 +31,7 @@ export const SEGMENT_MARKERS: SegmentMarkerWeights = {
     "удобно с детьми": 2
   },
   couple: {
-    "вдвоем": 2.4,
+    вдвоем: 2.4,
     пара: 2.3,
     романтич: 2.2,
     выходные: 1.4,

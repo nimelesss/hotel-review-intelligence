@@ -3,10 +3,7 @@ import {
   NEGATIVE_SENTIMENT_MARKERS,
   POSITIVE_SENTIMENT_MARKERS
 } from "@/server/analytics/lexicons/sentiment.lexicon";
-import {
-  INTENSIFIERS,
-  NEGATIONS
-} from "@/server/analytics/lexicons/modifiers.lexicon";
+import { INTENSIFIERS, NEGATIONS } from "@/server/analytics/lexicons/modifiers.lexicon";
 import { clamp } from "@/shared/lib/format";
 
 export interface SentimentScoringInput {
@@ -35,25 +32,21 @@ export function scoreSentiment(input: SentimentScoringInput): SentimentScoringRe
       const weighted = positive * modifier.factor * modifier.polarity;
       score += weighted;
       evidence.push(
-        `${modifier.negated ? "negated " : ""}+ ${token} (${weighted.toFixed(
-          2
-        )})`
+        `${modifier.negated ? "инвертировано " : ""}+ ${token} (${weighted.toFixed(2)})`
       );
     }
     if (negative > 0) {
       const weighted = negative * modifier.factor * modifier.polarity;
       score -= weighted;
       evidence.push(
-        `${modifier.negated ? "negated " : ""}- ${token} (${weighted.toFixed(
-          2
-        )})`
+        `${modifier.negated ? "инвертировано " : ""}- ${token} (${weighted.toFixed(2)})`
       );
     }
   });
 
   const ratingSignal = clamp((input.rating - 3) / 2, -1, 1) * 1.2;
   score += ratingSignal;
-  evidence.push(`rating signal (${ratingSignal.toFixed(2)})`);
+  evidence.push(`сигнал по оценке (${ratingSignal.toFixed(2)})`);
 
   if (tokenSet.has("но")) {
     score *= 0.9;
@@ -63,7 +56,7 @@ export function scoreSentiment(input: SentimentScoringInput): SentimentScoringRe
   return {
     label: toSentimentLabel(normalized),
     score: normalized,
-    evidence: evidence.slice(0, 10)
+    evidence: evidence.slice(0, 12)
   };
 }
 
@@ -77,10 +70,7 @@ function toSentimentLabel(score: number): SentimentLabel {
   return "neutral";
 }
 
-function matchWeighted(
-  token: string,
-  lexicon: Record<string, number>
-): number {
+function matchWeighted(token: string, lexicon: Record<string, number>): number {
   const direct = lexicon[token];
   if (direct) {
     return direct;

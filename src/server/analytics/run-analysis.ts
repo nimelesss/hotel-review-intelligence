@@ -37,7 +37,7 @@ export function runAnalysisForHotel(
     startedAt,
     completedAt: new Date().toISOString(),
     analysisVersion: ANALYSIS_VERSION,
-    notes: "Analysis completed with explainable hybrid rules.",
+    notes: "Анализ завершен: применены объяснимые гибридные правила.",
     progressPct: 100,
     stage: "completed"
   };

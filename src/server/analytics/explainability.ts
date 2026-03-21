@@ -25,7 +25,7 @@ export function buildExplanations(input: ExplainabilityInput): ReviewExplanation
     {
       type: "sentiment",
       title: `Тональность: ${translateSentiment(input.sentimentLabel)}`,
-      details: `Итоговый sentiment score: ${input.sentimentScore.toFixed(2)}.`,
+      details: `Итоговый индекс тональности: ${input.sentimentScore.toFixed(2)}.`,
       evidence: input.sentimentEvidence
     },
     {
@@ -34,15 +34,15 @@ export function buildExplanations(input: ExplainabilityInput): ReviewExplanation
       details:
         input.topicIds.length > 0
           ? input.topicIds.map((topic) => TOPIC_LABELS[topic]).join(", ")
-          : "Явные темы не выявлены.",
+          : "Явные тематические сигналы не обнаружены.",
       evidence: input.topicKeywords.slice(0, 8)
     },
     {
       type: "segment",
       title: `Сегмент: ${SEGMENT_LABELS[input.primarySegment]}`,
-      details: `${input.segmentRationale} Уверенность ${(
-        input.segmentConfidence * 100
-      ).toFixed(1)}%.`,
+      details: `${input.segmentRationale} Уверенность ${(input.segmentConfidence * 100).toFixed(
+        1
+      )}%.`,
       evidence: input.segmentMarkers
     }
   ];
@@ -51,7 +51,8 @@ export function buildExplanations(input: ExplainabilityInput): ReviewExplanation
     explanations.push({
       type: "risk",
       title: "Репутационные сигналы",
-      details: "Обнаружены маркеры потенциального операционного или репутационного риска.",
+      details:
+        "Обнаружены маркеры потенциального операционного или репутационного риска.",
       evidence: input.riskFlags
     });
   }
@@ -65,7 +66,7 @@ export function buildManagerImpact(
   topicIds: TopicId[],
   riskFlags: string[]
 ): ManagerImpact {
-  const primaryTopic = topicIds[0] ? TOPIC_LABELS[topicIds[0]] : "общий опыт";
+  const primaryTopic = topicIds[0] ? TOPIC_LABELS[topicIds[0]] : "общий клиентский опыт";
   const summary = `Отзыв отражает ${
     sentimentLabel === "positive"
       ? "позитивный"
@@ -77,12 +78,12 @@ export function buildManagerImpact(
   const operationalSignal =
     riskFlags.length > 0
       ? `Требуется операционная проверка: ${riskFlags.join("; ")}.`
-      : `Сигнал для операционного качества в теме "${primaryTopic}".`;
+      : `Операционный сигнал по теме "${primaryTopic}": поддерживать стандарт качества.`;
 
   const marketingSignal =
     sentimentLabel === "positive"
-      ? `Тему "${primaryTopic}" можно усиливать в коммуникациях.`
-      : `Коммуникацию по теме "${primaryTopic}" стоит скорректировать, чтобы снизить ожидания-разрывы.`;
+      ? `Тему "${primaryTopic}" можно усилить в коммерческих сообщениях и карточках объекта.`
+      : `Коммуникацию по теме "${primaryTopic}" стоит скорректировать, чтобы снизить разрыв ожиданий.`;
 
   return {
     summary,

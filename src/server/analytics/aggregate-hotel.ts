@@ -57,8 +57,7 @@ export function aggregateHotelAnalytics(
   const overallSentiment =
     totalReviews > 0
       ? toFixedSafe(
-          analyses.reduce((sum, analysis) => sum + analysis.sentimentScore, 0) /
-            totalReviews,
+          analyses.reduce((sum, analysis) => sum + analysis.sentimentScore, 0) / totalReviews,
           3
         )
       : 0;
@@ -69,10 +68,7 @@ export function aggregateHotelAnalytics(
   const positiveDrivers = buildDrivers(topicDistribution, "positive");
   const negativeDrivers = buildDrivers(topicDistribution, "negative");
   const keyRisks = buildRiskSummary(topicDistribution, analyses);
-  const growthOpportunities = buildGrowthOpportunities(
-    positiveDrivers,
-    segmentDistribution
-  );
+  const growthOpportunities = buildGrowthOpportunities(positiveDrivers, segmentDistribution);
   const segmentInsights = buildSegmentInsights(analyses, totalReviews);
 
   return {
@@ -101,13 +97,10 @@ function buildSegmentDistribution(
     acc[id] = 0;
     return acc;
   }, {} as Record<SegmentId, number>);
-  const sentimentBySegment = TRACKED_SEGMENTS.reduce<Record<SegmentId, number[]>>(
-    (acc, id) => {
-      acc[id] = [];
-      return acc;
-    },
-    {} as Record<SegmentId, number[]>
-  );
+  const sentimentBySegment = TRACKED_SEGMENTS.reduce<Record<SegmentId, number[]>>((acc, id) => {
+    acc[id] = [];
+    return acc;
+  }, {} as Record<SegmentId, number[]>);
 
   analyses.forEach((analysis) => {
     counts[analysis.primarySegment] += 1;
@@ -119,8 +112,7 @@ function buildSegmentDistribution(
     const sentimentValues = sentimentBySegment[segmentId];
     const avgSentiment =
       sentimentValues.length > 0
-        ? sentimentValues.reduce((sum, value) => sum + value, 0) /
-          sentimentValues.length
+        ? sentimentValues.reduce((sum, value) => sum + value, 0) / sentimentValues.length
         : 0;
     return {
       id: segmentId,
@@ -181,11 +173,7 @@ function buildDrivers(
         label: topic.label,
         score: toFixedSafe(score, 3),
         mentionShare: toFixedSafe(
-          topic.mentions /
-            Math.max(
-              1,
-              topicDistribution.reduce((sum, item) => sum + item.mentions, 0)
-            ),
+          topic.mentions / Math.max(1, topicDistribution.reduce((sum, item) => sum + item.mentions, 0)),
           3
         ),
         evidence: [
@@ -207,12 +195,13 @@ function buildRiskSummary(
     .filter((topic) => topic.riskLevel === "high")
     .map((topic) => `Высокий риск: ${topic.label}`);
 
-  const recurringFlags = analyses
-    .flatMap((analysis) => analysis.riskFlags)
-    .reduce<Record<string, number>>((acc, flag) => {
+  const recurringFlags = analyses.flatMap((analysis) => analysis.riskFlags).reduce<Record<string, number>>(
+    (acc, flag) => {
       acc[flag] = (acc[flag] ?? 0) + 1;
       return acc;
-    }, {});
+    },
+    {}
+  );
 
   const frequentFlags = Object.entries(recurringFlags)
     .filter(([, count]) => count >= 2)
@@ -229,36 +218,31 @@ function buildGrowthOpportunities(
 ): string[] {
   const opportunities: string[] = [];
 
-  const businessSegment = segmentDistribution.find(
-    (item) => item.id === "business_traveler"
-  );
+  const businessSegment = segmentDistribution.find((item) => item.id === "business_traveler");
   if (businessSegment && businessSegment.share > 0.25) {
     opportunities.push(
-      "Бизнес-сегмент доминирует: усилить коммерческие сообщения о Wi-Fi, рабочем комфорте и скорости сервиса."
+      "Бизнес-сегмент формирует значимую часть спроса: усилить коммуникацию про Wi-Fi, рабочее место и скорость сервиса."
     );
   }
 
   const locationDriver = positiveDrivers.find((driver) => driver.topic === "location");
   if (locationDriver) {
     opportunities.push(
-      "Сильная тема расположения: добавить гео-преимущества в digital-контент и OTA-описания."
+      "Сильная тема расположения: выделить транспортные преимущества в карточках отеля и рекламе."
     );
   }
 
   const familySegment = segmentDistribution.find((item) => item.id === "family");
   if (familySegment && familySegment.share < 0.12) {
     opportunities.push(
-      "Недораскрытый семейный сегмент: протестировать пакетные предложения на выходные и family-amenities."
+      "Семейный сегмент недораскрыт: протестировать семейные тарифы и пакетные предложения на выходные."
     );
   }
 
   return opportunities.slice(0, 5);
 }
 
-function buildSegmentInsights(
-  analyses: ReviewAnalysis[],
-  totalReviews: number
-): SegmentInsight[] {
+function buildSegmentInsights(analyses: ReviewAnalysis[], totalReviews: number): SegmentInsight[] {
   return TRACKED_SEGMENTS.map((segment) => {
     const current = analyses.filter((analysis) => analysis.primarySegment === segment);
     if (!current.length) {
@@ -270,8 +254,7 @@ function buildSegmentInsights(
         valuedTopics: [],
         complaintTopics: [],
         businessMeaning: "Недостаточно данных по сегменту.",
-        confidenceNote:
-          "Сегмент мало представлен в выборке, выводы носят индикативный характер."
+        confidenceNote: "Сегмент слабо представлен в выборке, выводы индикативны."
       };
     }
 
@@ -288,9 +271,7 @@ function buildSegmentInsights(
       .slice(0, 3)
       .map((item) => item.topic);
 
-    const avgSentiment =
-      current.reduce((sum, analysis) => sum + analysis.sentimentScore, 0) /
-      current.length;
+    const avgSentiment = current.reduce((sum, analysis) => sum + analysis.sentimentScore, 0) / current.length;
 
     return {
       segment,
@@ -302,8 +283,8 @@ function buildSegmentInsights(
       businessMeaning: buildBusinessMeaning(segment, avgSentiment, valuedTopics),
       confidenceNote:
         current.length < 4
-          ? "Низкая статистическая насыщенность: усиливайте выборку для более устойчивых выводов."
-          : "Уверенность достаточная для управленческих гипотез и приоритизации действий."
+          ? "Низкая статистическая насыщенность: желательно увеличить массив отзывов."
+          : "Объем данных достаточен для приоритизации управленческих действий."
     };
   }).sort((a, b) => b.share - a.share);
 }
@@ -338,40 +319,36 @@ function groupTopics(
     }));
 }
 
-function buildBusinessMeaning(
-  segment: SegmentId,
-  avgSentiment: number,
-  valuedTopics: TopicId[]
-): string {
+function buildBusinessMeaning(segment: SegmentId, avgSentiment: number, valuedTopics: TopicId[]): string {
   const base =
     segment === "business_traveler"
-      ? "Сегмент формирует ядро загрузки в будни."
+      ? "Сегмент формирует загрузку в будние дни."
       : segment === "family"
-      ? "Сегмент влияет на weekend occupancy и дополнительную выручку."
+      ? "Сегмент влияет на выходную загрузку и дополнительную выручку."
       : segment === "couple"
-      ? "Сегмент усиливает leisure-позиционирование объекта."
+      ? "Сегмент поддерживает leisure-позиционирование объекта."
       : segment === "transit_guest"
-      ? "Сегмент важен для краткосрочной загрузки по маршрутам."
+      ? "Сегмент важен для краткосрочной загрузки на транзитных маршрутах."
       : segment === "event_guest"
-      ? "Сегмент критичен в периодах событийного спроса."
+      ? "Сегмент критичен в периоды событийного спроса."
       : segment === "solo_traveler"
       ? "Сегмент чувствителен к цене и скорости сервиса."
       : "Сегмент требует дополнительной детализации.";
 
   const topicHint =
     valuedTopics.length > 0
-      ? `Основные ценности: ${valuedTopics
+      ? `Ключевые ценности: ${valuedTopics
           .slice(0, 2)
           .map((topic) => TOPIC_LABELS[topic])
           .join(", ")}.`
-      : "Выраженные ценностные темы пока не обнаружены.";
+      : "Выраженные ценностные темы пока не определены.";
 
   const sentimentHint =
     avgSentiment < -0.2
-      ? "Есть риск снижения лояльности, требуется операционный фокус."
+      ? "Есть риск снижения лояльности, нужен операционный фокус."
       : avgSentiment > 0.2
       ? "Сегмент можно активнее использовать в маркетинговом позиционировании."
-      : "Тональность нейтральная, нужны точечные улучшения качества опыта.";
+      : "Тональность нейтральная, нужны точечные улучшения клиентского пути.";
 
   return `${base} ${topicHint} ${sentimentHint}`;
 }
