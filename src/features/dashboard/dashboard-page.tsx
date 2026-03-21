@@ -108,7 +108,7 @@ export function DashboardPage() {
     const query = queryInput.trim();
     if (query.length < 2) {
       if (!silent) {
-        setSearchError("\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043c\u0438\u043d\u0438\u043c\u0443\u043c 2 \u0441\u0438\u043c\u0432\u043e\u043b\u0430.");
+        setSearchError("Введите минимум 2 символа.");
       }
       setSearchResults([]);
       return;
@@ -128,7 +128,7 @@ export function DashboardPage() {
 
       if (!response.items.length && !silent) {
         setSearchError(
-          "\u041f\u043e \u044d\u0442\u043e\u043c\u0443 \u0437\u0430\u043f\u0440\u043e\u0441\u0443 \u043e\u0442\u0435\u043b\u0438 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u044b. \u0423\u0442\u043e\u0447\u043d\u0438\u0442\u0435 \u043e\u0431\u044a\u0435\u043a\u0442 \u0438 \u0433\u043e\u0440\u043e\u0434, \u043d\u0430\u043f\u0440\u0438\u043c\u0435\u0440: \u00abCourtyard by Marriott \u0420\u043e\u0441\u0442\u043e\u0432-\u043d\u0430-\u0414\u043e\u043d\u0443\u00bb."
+          "По этому запросу отели не найдены. Уточните объект и город, например: «Courtyard by Marriott Ростов-на-Дону»."
         );
       }
     } catch (err) {
@@ -136,7 +136,7 @@ export function DashboardPage() {
         setSearchError(
           err instanceof Error
             ? err.message
-            : "\u041f\u043e\u0438\u0441\u043a \u0432\u0440\u0435\u043c\u0435\u043d\u043d\u043e \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d."
+            : "Поиск временно недоступен."
         );
       }
     } finally {
@@ -616,7 +616,7 @@ function SearchHero(props: {
       <div className="grid gap-3 md:grid-cols-[1fr_auto]">
         <Input
           value={searchQuery}
-          placeholder="\u041d\u0430\u043f\u0440\u0438\u043c\u0435\u0440: Courtyard by Marriott \u0420\u043e\u0441\u0442\u043e\u0432-\u043d\u0430-\u0414\u043e\u043d\u0443"
+          placeholder="Например: Courtyard by Marriott Ростов-на-Дону"
           onChange={(event) => setSearchQuery(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
@@ -633,13 +633,13 @@ function SearchHero(props: {
           className={searching ? "animate-pulse" : ""}
         >
           {searching
-            ? "\u0418\u0449\u0435\u043c \u043e\u0442\u0435\u043b\u0438..."
-            : "\u041d\u0430\u0439\u0442\u0438 \u043e\u0442\u0435\u043b\u044c"}
+            ? "Ищем отели..."
+            : "Найти отель"}
         </Button>
       </div>
 
       <p className="mt-2 text-xs text-textMuted">
-        {"\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0438 \u043f\u043e\u044f\u0432\u043b\u044f\u044e\u0442\u0441\u044f \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438 \u043f\u0440\u0438 \u0432\u0432\u043e\u0434\u0435 2+ \u0441\u0438\u043c\u0432\u043e\u043b\u043e\u0432."}
+        {"Подсказки появляются автоматически при вводе 2+ символов."}
       </p>
 
       {searchError ? <p className="mt-3 text-sm text-danger">{searchError}</p> : null}
