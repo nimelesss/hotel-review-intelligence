@@ -1,106 +1,89 @@
 # Hotel Review Intelligence
 
-B2B SaaS foundation for hotel management analytics from guest reviews.
+B2B-платформа для гостиничного менеджмента: превращает отзывы гостей в управленческую аналитику, сегменты и рекомендации.
 
-## MVP Includes
-- Next.js + TypeScript + Tailwind product shell
-- Domain model: `Hotel`, `Review`, `ReviewAnalysis`, `HotelAggregate`, `Recommendation`, `AnalysisRun`
-- Explainable analytics:
-  - text preprocessing
-  - sentiment scoring
-  - topic detection
-  - probabilistic segment scoring
-  - confidence + explanation markers
-- Rule-based recommendation engine
-- Ingestion pipeline:
-  - upload (`csv` / `json`)
-  - validation
-  - normalization
-  - dedupe
-  - import + analysis run
-- Async platform runs with progress stages and animated processing UI
-- Runtime persistence for created hotels/reviews/runs (`.runtime-store.json`)
+## Что уже реализовано
+- Веб-приложение на `Next.js + TypeScript + Tailwind`.
+- Экран поиска: можно найти и добавить любой отель в России.
+- Аналитика:
+  - предобработка текстов,
+  - тональность,
+  - тематический анализ,
+  - вероятностная сегментация,
+  - explainable-обоснование.
+- Dashboard с управленческой сводкой:
+  - KPI,
+  - драйверы позитива/негатива,
+  - риски,
+  - инсайты по сегментам,
+  - покрытие источников по отзывам.
+- Модуль загрузки:
+  - ручной импорт CSV/JSON,
+  - запуск сборов по площадкам,
+  - прогресс-этапы и история запусков.
+- Runtime-хранилище в `.runtime-store.json`.
 
-## Real Review Sources (RF-focused)
-Platform ingestion is configured for Russian ecosystems:
+## Российские источники отзывов
+Система поддерживает провайдеры:
 - `yandex_maps_dataset`
 - `two_gis_dataset`
-- `russian_travel_dataset` (mixed local aggregators)
+- `ostrovok_dataset`
+- `russian_travel_dataset`
 
-These connectors accept dataset/export URL with paginated JSON items.  
-Typical format:
+Провайдеры работают с JSON dataset URL, например:
 
 ```text
 https://api.apify.com/v2/datasets/<dataset-id>/items?token=<token>
 ```
 
-You can also use your own JSON export endpoint if it returns array-based review records.
+## Режимы синхронизации
+1. Портфельная синхронизация (по всем отелям и таргетам).
+2. Realtime-синхронизация для выбранного отеля.
 
-## Hybrid Sync Strategy
-The product supports both modes:
-- Portfolio weekly sync (all hotels + all configured providers)
-- Realtime sync for one selected hotel (fan-out across all configured providers)
-
-### Environment config for orchestration
-Set on server (`/etc/hotel-review-intelligence.env`):
+### Обязательные переменные сервера
+В `/etc/hotel-review-intelligence.env`:
 
 ```bash
 SYNC_TRIGGER_TOKEN=replace_with_long_random_token
-PORTFOLIO_SYNC_TARGETS_JSON=[{"hotelId":"hotel-courtyard-rostov","provider":"yandex_maps_dataset","datasetUrl":"https://api.apify.com/v2/datasets/<id>/items?token=<token>","limit":300},{"hotelId":"hotel-courtyard-rostov","provider":"two_gis_dataset","datasetUrl":"https://api.apify.com/v2/datasets/<id>/items?token=<token>","limit":300}]
+PORTFOLIO_SYNC_TARGETS_JSON=[{"hotelId":"hotel-courtyard-rostov","provider":"yandex_maps_dataset","datasetUrl":"https://api.apify.com/v2/datasets/<id>/items?token=<token>","limit":300}]
 ```
 
-Supported target fields:
-- `hotelId` or `hotelName` (one is required)
-- `provider`
-- `datasetUrl`
-- optional: `query`, `language`, `limit`, `enabled`
+### Опционально: fallback для любого нового отеля
+Если для отеля нет персональных таргетов, используется:
 
-### API endpoints
-- `POST /api/sync/realtime-hotel`  
-  Starts fan-out sync for one hotel using configured targets.
-- `POST /api/sync/portfolio`  
-  Starts all-hotel sync. Requires `Authorization: Bearer <SYNC_TRIGGER_TOKEN>`.
-- `GET /api/sync/portfolio`  
-  Returns readiness summary. Requires the same bearer token.
+```bash
+DEFAULT_REALTIME_TARGETS_JSON=[{"provider":"yandex_maps_dataset","datasetUrl":"https://api.apify.com/v2/datasets/<id>/items?token=<token>","limit":300},{"provider":"two_gis_dataset","datasetUrl":"https://api.apify.com/v2/datasets/<id>/items?token=<token>","limit":300},{"provider":"ostrovok_dataset","datasetUrl":"https://api.apify.com/v2/datasets/<id>/items?token=<token>","limit":300}]
+```
 
-## Quick Start
-Requires Node.js 20+.
+## API
+- `GET /api/hotels` — список отелей.
+- `POST /api/hotels` — создать профиль отеля.
+- `GET /api/hotels/search?q=...` — поиск отелей по РФ.
+- `GET /api/hotels/:hotelId/dashboard` — сводка.
+- `GET /api/reviews` — выборка отзывов с фильтрами.
+- `POST /api/analysis-runs/from-platform` — запуск по одному провайдеру.
+- `POST /api/sync/realtime-hotel` — запуск по всем доступным источникам для отеля.
+- `POST /api/sync/portfolio` — портфельный запуск (требует `SYNC_TRIGGER_TOKEN`).
+
+## Локальный запуск
+Требуется `Node.js 20+`.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open: `http://localhost:3000`
+Открыть: `http://localhost:3000`
 
-## Main Pages
-- `/` Dashboard
-- `/reviews` Review Explorer
-- `/segments` Segment Analysis
-- `/recommendations` Recommendations
-- `/methodology` Methodology
-- `/upload` Data Upload + Analysis Run
+## Маршруты приложения
+- `/` — сводка
+- `/reviews` — отзывы
+- `/segments` — сегменты
+- `/recommendations` — рекомендации
+- `/upload` — загрузка данных
+- `/methodology` — методика
 
-## Deployment
-Project contains GitHub Actions workflow for VPS deployment:
-- `.github/workflows/deploy.yml`
-- `.github/workflows/weekly-sync.yml` (weekly sync trigger)
-
-Expected server app URL example:
-- `http://<server-ip>:3100`
-
-## Project Structure
-- `app/` routes + API handlers
-- `src/features/` page-level modules
-- `src/shared/` UI kit, utils, config
-- `src/server/analytics/` explainable analytics engine
-- `src/server/ingestion/` ingestion pipeline
-- `src/server/platform-fetch/` external source connectors
-- `src/server/repositories/` repository abstraction + adapters
-- `src/data/seeds/` seed data
-- `docs/product-architecture.md` architecture spec
-
-## Current MVP Limits
-- Default storage is in-memory + runtime JSON snapshot
-- No RBAC/auth in MVP
-- Upload UI currently uses text payload input (file picker planned in V1)
+## Ограничения MVP
+- Хранилище runtime-файловое, без PostgreSQL.
+- Нет авторизации/RBAC.
+- Для «реального» охвата площадок нужны корректные dataset URL и доступы к источникам.
