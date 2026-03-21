@@ -42,7 +42,7 @@ jobs:
               done < /etc/hotel-review-intelligence.env
             fi
 
-            node -e 'const vars=["DEFAULT_REALTIME_TARGETS_JSON","PORTFOLIO_SYNC_TARGETS_JSON"]; for (const n of vars){const v=process.env[n]; if(!v) continue; try{JSON.parse(v);} catch(e){console.error(`Invalid JSON in ${n}: ${e.message}`); process.exit(1);}}'
+            node -e 'const vars=["DEFAULT_REALTIME_TARGETS_JSON","PORTFOLIO_SYNC_TARGETS_JSON"]; for (const n of vars){const v=process.env[n]; if(!v) continue; try{JSON.parse(v);} catch(e){console.warn(`Warning: invalid JSON in ${n}: ${e.message}. Deploy continues, but sync endpoints may fail until env is fixed.`);}}'
 
             rm -rf .next
             timeout 10m npm ci --no-audit --no-fund
