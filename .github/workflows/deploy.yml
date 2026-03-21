@@ -30,6 +30,7 @@ jobs:
             npm ci
             npm run build
             systemctl restart hotel-review-intelligence
+
             DOMAIN="hotel-review-intelligence.ru"
             WWW_DOMAIN="www.hotel-review-intelligence.ru"
             APP_IP="83.136.235.103"
@@ -37,6 +38,8 @@ jobs:
             NGINX_CONF="/etc/nginx/sites-available/hotel-review-intelligence.ru.conf"
             NGINX_ENABLED="/etc/nginx/sites-enabled/hotel-review-intelligence.ru.conf"
 
+            set +e
+            echo "Starting best-effort domain setup..."
             if ! command -v nginx >/dev/null 2>&1; then
               apt-get update
               apt-get install -y nginx
@@ -83,6 +86,7 @@ jobs:
               echo "DOMAIN_IPS=$DOMAIN_IPS"
               echo "WWW_IPS=$WWW_IPS"
             fi
+            set -e
 
             for i in $(seq 1 20); do
               if systemctl is-active --quiet hotel-review-intelligence; then
