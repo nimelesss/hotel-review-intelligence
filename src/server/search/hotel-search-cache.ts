@@ -2,6 +2,7 @@
 import path from "node:path";
 import { HotelSearchResult } from "@/entities/types";
 import { seedHotelSearchCatalog } from "@/data/seeds/hotel-search-catalog";
+import importedSearchCatalog from "@/data/seeds/russia-hotels-search-catalog.json";
 import { loadRussiaHotelsCatalog } from "@/server/catalog/catalog-loader";
 import { decodeEscapedUnicode, normalizeSearchText, normalizeWhitespace } from "@/shared/lib/text";
 
@@ -12,7 +13,7 @@ interface CacheFilePayload {
 
 const DEFAULT_CACHE_LIMIT = 50_000;
 const DEFAULT_MEMORY_TTL_MS = 60_000;
-const DEFAULT_INCLUDE_SEED_CATALOG = false;
+const DEFAULT_INCLUDE_SEED_CATALOG = true;
 const REMOTE_HYDRATE_RETRY_MS = 5 * 60 * 1000;
 const ADDRESS_ADMIN_WORDS = [
   "район",
@@ -181,7 +182,9 @@ function loadCache(): HotelSearchResult[] {
 
   const includeSeed = shouldIncludeSeedCatalog();
   const fromDisk = readCacheFromDisk().filter((item) => (includeSeed ? true : !isSeedItem(item)));
-  const seedItems = includeSeed ? seedHotelSearchCatalog : [];
+  const seedItems = includeSeed
+    ? [...seedHotelSearchCatalog, ...mapImportedSeedCatalog(importedSearchCatalog)]
+    : [];
   const merged = mergeUnique([...seedItems, ...fromDisk]).slice(0, getCacheLimit());
 
   memoryCache = merged;
@@ -198,6 +201,34 @@ function saveCache(items: HotelSearchResult[]): void {
   memoryCache = items;
   memoryLoadedAt = Date.now();
   writeCacheToDisk(items);
+}
+
+function mapImportedSeedCatalog(value: unknown): HotelSearchResult[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => sanitizeImportedSeedItem(item))
+    .filter((item): item is HotelSearchResult => !!item);
+}
+
+function sanitizeImportedSeedItem(value: unknown): HotelSearchResult | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const item = value as Partial<HotelSearchResult>;
+
+  return sanitizeCatalogItem({
+    externalId: typeof item.externalId === "string" ? item.externalId : "",
+    name: typeof item.name === "string" ? item.name : "",
+    city: typeof item.city === "string" ? item.city : "",
+    country: typeof item.country === "string" ? item.country : "Россия",
+    address: typeof item.address === "string" ? item.address : "",
+    coordinates: item.coordinates,
+    source: "catalog_import"
+  });
 }
 
 export async function hydrateHotelCatalogFromRemoteSource(): Promise<void> {
@@ -360,3 +391,4 @@ function dedupe(values: string[]): string[] {
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
