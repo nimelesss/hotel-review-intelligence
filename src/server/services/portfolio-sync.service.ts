@@ -224,6 +224,13 @@ export function startRealtimeSyncForHotel(hotelIdRaw: string): PortfolioSyncResu
   const warnings: string[] = [];
   const runs: AnalysisRun[] = [];
 
+  // Safety net for manually created duplicates:
+  // if selected profile has no reviews, try to bootstrap from canonical local hotel with reviews.
+  const bootstrapRun = bootstrapFromCanonicalLocalHotelIfNeeded(hotel);
+  if (bootstrapRun) {
+    runs.push(bootstrapRun);
+  }
+
   if (matchingTargets.length) {
     matchingTargets.forEach((target) => {
       const run = runTargetForHotel(hotelId, target, warnings);
@@ -266,15 +273,133 @@ export function startRealtimeSyncForHotel(hotelIdRaw: string): PortfolioSyncResu
     }
   }
 
+  if (!runs.length) {
+    const failedRun = createFailedRealtimeRun(
+      hotel.id,
+      "No local reviews and no configured external providers for this hotel."
+    );
+    runs.push(failedRun);
+  }
+
   return {
     mode: "manual",
     startedAt: new Date().toISOString(),
-    targetsTotal: Math.max(runs.length, 1),
+    targetsTotal: runs.length,
     targetsStarted: runs.length,
     hotelsCovered: runs.length ? 1 : 0,
     runs,
     warnings
   };
+}
+
+function bootstrapFromCanonicalLocalHotelIfNeeded(hotel: Hotel): AnalysisRun | null {
+  const repository = getRepository();
+  const currentReviews = repository.listReviewsByHotel(hotel.id);
+  if (currentReviews.length > 0) {
+    return null;
+  }
+
+  const donor = findCanonicalDonorHotel(hotel, repository.listHotels());
+  if (!donor) {
+    return null;
+  }
+
+  const donorReviews = repository.listReviewsByHotel(donor.id);
+  if (!donorReviews.length) {
+    return null;
+  }
+
+  const now = new Date().toISOString();
+  const clonedReviews = donorReviews.map((review) => ({
+    ...review,
+    id: createId("review-clone"),
+    hotelId: hotel.id,
+    sourceReviewId: review.sourceReviewId
+      ? `${review.sourceReviewId}|alias:${hotel.id}`
+      : undefined,
+    createdAt: now,
+    updatedAt: now
+  }));
+
+  const outcome = runAnalysisForHotel(hotel.id, clonedReviews, "seed");
+  const run: AnalysisRun = {
+    id: createId("run-canonical-bootstrap"),
+    hotelId: hotel.id,
+    sourceType: "seed",
+    totalReviewsProcessed: clonedReviews.length,
+    status: "completed",
+    startedAt: now,
+    completedAt: now,
+    analysisVersion: ANALYSIS_VERSION,
+    notes: `Local bootstrap from canonical hotel "${donor.name}" (${donor.city}).`,
+    progressPct: 100,
+    stage: "completed",
+    fetchedReviews: clonedReviews.length
+  };
+
+  repository.upsertAnalytics(
+    hotel.id,
+    clonedReviews,
+    outcome.analyses,
+    outcome.aggregate,
+    outcome.recommendations,
+    run
+  );
+
+  return run;
+}
+
+function findCanonicalDonorHotel(hotel: Hotel, hotels: Hotel[]): Hotel | null {
+  const hotelName = normalizeIdentity(hotel.name);
+  const hotelCity = normalizeIdentity(hotel.city);
+  if (!hotelName) {
+    return null;
+  }
+
+  const candidates = hotels
+    .filter((candidate) => candidate.id !== hotel.id && (candidate.reviewCount ?? 0) > 0)
+    .map((candidate) => ({
+      candidate,
+      score: scoreDonorCandidate(hotelName, hotelCity, candidate)
+    }))
+    .filter((item) => item.score >= 100)
+    .sort((a, b) => b.score - a.score);
+
+  return candidates[0]?.candidate ?? null;
+}
+
+function scoreDonorCandidate(
+  hotelName: string,
+  hotelCity: string,
+  candidate: Pick<Hotel, "name" | "city">
+): number {
+  const candidateName = normalizeIdentity(candidate.name);
+  const candidateCity = normalizeIdentity(candidate.city);
+
+  let score = 0;
+  if (candidateName === hotelName) {
+    score += 140;
+  }
+  if (candidateName.includes(hotelName) || hotelName.includes(candidateName)) {
+    score += 80;
+  }
+  if (hotelCity && candidateCity === hotelCity) {
+    score += 40;
+  }
+  if (!hotelCity) {
+    score += 15;
+  }
+  return score;
+}
+
+function normalizeIdentity(value: string): string {
+  return value
+    .toLocaleLowerCase("ru-RU")
+    .replace(/\u0451/g, "\u0435")
+    .replace(/[^\p{L}\p{N}\s-]+/gu, " ")
+    .replace(/\b(отель|гостиница|hotel|hostel|by|marriott)\b/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function runLocalReanalysisIfPossible(
@@ -313,6 +438,28 @@ function runLocalReanalysisIfPossible(
     run
   );
 
+  return run;
+}
+
+function createFailedRealtimeRun(hotelId: string, errorMessage: string): AnalysisRun {
+  const repository = getRepository();
+  const now = new Date().toISOString();
+  const run: AnalysisRun = {
+    id: createId("run-local-failed"),
+    hotelId,
+    sourceType: "platform_api",
+    totalReviewsProcessed: repository.listReviewsByHotel(hotelId).length,
+    status: "failed",
+    startedAt: now,
+    completedAt: now,
+    analysisVersion: ANALYSIS_VERSION,
+    notes: "Realtime collection could not start for selected hotel.",
+    progressPct: 100,
+    stage: "failed",
+    errorMessage
+  };
+
+  repository.createRun(run);
   return run;
 }
 

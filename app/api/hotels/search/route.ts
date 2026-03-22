@@ -28,9 +28,12 @@ export async function GET(request: Request) {
     queryVariants
   );
 
-  const withoutReviewFilter = scoreRepositoryHotels(hotels, queryVariants);
+  let entries = dedupeScoredEntries(withReviews);
 
-  let entries = dedupeScoredEntries([...withReviews, ...withoutReviewFilter]);
+  if (!entries.length) {
+    const withoutReviewFilter = scoreRepositoryHotels(hotels, queryVariants);
+    entries = dedupeScoredEntries(withoutReviewFilter);
+  }
 
   if (entries.length < limit) {
     await hydrateHotelCatalogFromRemoteSource();

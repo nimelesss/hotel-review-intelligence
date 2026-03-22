@@ -130,6 +130,18 @@ export function DashboardPage() {
     [hotels, selectedHotelId]
   );
 
+  useEffect(() => {
+    if (!dashboard?.latestRun || dashboard.latestRun.status !== "running") {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setReloadKey((prev) => prev + 1);
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, [dashboard?.latestRun?.id, dashboard?.latestRun?.status, dashboard?.latestRun?.progressPct]);
+
   const searchHotelsByQuery = useCallback(async (queryInput: string, silent = false) => {
     const query = queryInput.trim();
     if (query.length < 2) {
