@@ -685,7 +685,7 @@ function SearchHero(props: {
   } = props;
 
   return (
-    <Card className="relative overflow-hidden border-accent/30 bg-gradient-to-br from-[#f6fbff] via-white to-[#eaf6ff]">
+    <Card className="search-hero-card relative overflow-hidden border-border">
       <div className="search-hero-orb pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-cyan-200/55 blur-2xl" />
       <div className="search-hero-orb pointer-events-none absolute -bottom-12 -right-10 h-48 w-48 rounded-full bg-blue-200/45 blur-2xl" />
       <CardTitle
@@ -728,7 +728,7 @@ function SearchHero(props: {
           {searchResults.map((item) => (
             <article
               key={item.externalId}
-              className="search-result-card rounded-lg border border-border bg-white/85 p-3"
+              className="search-result-card rounded-lg border border-border bg-panelMuted p-3"
             >
               <p className="text-sm font-semibold">{item.name}</p>
               <p className="mt-1 text-xs text-textMuted">

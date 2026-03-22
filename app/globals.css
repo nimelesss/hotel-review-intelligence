@@ -17,6 +17,7 @@
   --info: #246fb5;
   --bg-glow-1: rgba(14, 126, 152, 0.15);
   --bg-glow-2: rgba(29, 74, 132, 0.12);
+  --search-hero-bg: linear-gradient(135deg, #f6fbff 0%, #ffffff 42%, #eaf6ff 100%);
 }
 
 html {
@@ -38,6 +39,12 @@ html[data-theme="dark"] {
   --info: #65b1ff;
   --bg-glow-1: rgba(26, 162, 195, 0.2);
   --bg-glow-2: rgba(44, 106, 196, 0.16);
+  --search-hero-bg: linear-gradient(
+    135deg,
+    rgba(17, 27, 40, 0.98) 0%,
+    rgba(23, 37, 55, 0.98) 42%,
+    rgba(16, 35, 52, 0.98) 100%
+  );
   color-scheme: dark;
 }
 
@@ -213,6 +220,10 @@ h4 {
 
 .search-hero-orb {
   animation: pulseHalo 4s ease-in-out infinite;
+}
+
+.search-hero-card {
+  background: var(--search-hero-bg);
 }
 
 .search-result-card {
