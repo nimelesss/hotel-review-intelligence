@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { Hotel, RecommendationPayload } from "@/entities/types";
@@ -9,7 +9,7 @@ import { Badge } from "@/shared/ui/badge";
 import { Card, CardTitle } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Select } from "@/shared/ui/select";
-import { ErrorState, LoadingState } from "@/shared/ui/states";
+import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/states";
 
 interface HotelListResponse {
   items: Hotel[];
@@ -21,6 +21,8 @@ export function RecommendationsPage() {
   const [payload, setPayload] = useState<RecommendationPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const stalePayload = payload && selectedHotelId && payload.hotel.id !== selectedHotelId;
 
   useEffect(() => {
     const loadHotels = async () => {
@@ -61,7 +63,7 @@ export function RecommendationsPage() {
     void loadRecommendations();
   }, [selectedHotelId]);
 
-  if (loading && !payload) {
+  if ((loading && !payload) || stalePayload) {
     return <LoadingState label="Формирую рекомендации..." />;
   }
   if (error && !payload) {
@@ -80,12 +82,9 @@ export function RecommendationsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Рекомендации"
-        subtitle="Приоритизированные действия с прозрачным обоснованием."
+        subtitle="Приоритизированные действия с прозрачным бизнес-обоснованием."
         rightSlot={
-          <Select
-            value={selectedHotelId}
-            onChange={(event) => setSelectedHotelId(event.target.value)}
-          >
+          <Select value={selectedHotelId} onChange={(event) => setSelectedHotelId(event.target.value)}>
             {hotels.map((hotel) => (
               <option key={hotel.id} value={hotel.id}>
                 {hotel.name}
@@ -96,30 +95,37 @@ export function RecommendationsPage() {
       />
 
       <div className="grid gap-4 xl:grid-cols-2">
-        {payload.recommendations.map((recommendation) => (
-          <Card key={recommendation.id}>
-            <CardTitle title={recommendation.title} subtitle={recommendation.description} />
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="info">{translateCategory(recommendation.category)}</Badge>
-              <Badge variant={priorityVariant(recommendation.priority)}>
-                {translatePriority(recommendation.priority)}
-              </Badge>
-              <Badge variant="default">Эффект {recommendation.impactScore.toFixed(1)}</Badge>
-              <Badge variant="default">Трудоемкость {recommendation.effortScore.toFixed(1)}</Badge>
-            </div>
-            <p className="mt-3 text-sm text-textMuted">{recommendation.rationale}</p>
-            <p className="mt-3 text-xs text-textMuted">
-              Сегменты:{" "}
-              {recommendation.relatedSegments
-                .map((segment) => SEGMENT_LABELS[segment])
-                .join(", ") || "-"}
-            </p>
-            <p className="mt-1 text-xs text-textMuted">
-              Темы:{" "}
-              {recommendation.relatedTopics.map((topic) => TOPIC_LABELS[topic]).join(", ") || "-"}
-            </p>
-          </Card>
-        ))}
+        {payload.recommendations.length ? (
+          payload.recommendations.map((recommendation) => (
+            <Card key={recommendation.id}>
+              <CardTitle title={recommendation.title} subtitle={recommendation.description} />
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="info">{translateCategory(recommendation.category)}</Badge>
+                <Badge variant={priorityVariant(recommendation.priority)}>
+                  {translatePriority(recommendation.priority)}
+                </Badge>
+                <Badge variant="default">Эффект {recommendation.impactScore.toFixed(1)}</Badge>
+                <Badge variant="default">Трудоемкость {recommendation.effortScore.toFixed(1)}</Badge>
+              </div>
+              <p className="mt-3 text-sm text-textMuted">{recommendation.rationale}</p>
+              <p className="mt-3 text-xs text-textMuted">
+                Сегменты:{" "}
+                {recommendation.relatedSegments.map((segment) => SEGMENT_LABELS[segment]).join(", ") || "-"}
+              </p>
+              <p className="mt-1 text-xs text-textMuted">
+                Темы:{" "}
+                {recommendation.relatedTopics.map((topic) => TOPIC_LABELS[topic]).join(", ") || "-"}
+              </p>
+            </Card>
+          ))
+        ) : (
+          <div className="xl:col-span-2">
+            <EmptyState
+              title="Рекомендации пока не сформированы"
+              description="Добавьте новые отзывы или запустите переанализ, чтобы сформировать управленческие действия."
+            />
+          </div>
+        )}
       </div>
     </div>
   );
