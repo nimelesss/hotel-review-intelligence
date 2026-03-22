@@ -50,6 +50,8 @@ export interface Hotel {
   coordinates?: Coordinates;
   description: string;
   externalId?: string;
+  reviewCount?: number;
+  latestReviewDate?: string;
   createdAt: string;
   updatedAt: string;
 }

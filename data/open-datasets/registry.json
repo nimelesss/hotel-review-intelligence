@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "generatedAt": "2026-03-22T00:00:00.000Z",
+  "datasets": [
+    {
+      "id": "kaggle:kyakovlev/yandex-geo-reviews-dataset-2023",
+      "provider": "kaggle",
+      "role": [
+        "reviews",
+        "catalog"
+      ],
+      "localPath": "data/external/kaggle/yandex-geo-reviews-2023/geo-reviews-dataset-2023.csv",
+      "format": "csv",
+      "encoding": "utf-8",
+      "snapshotDate": "2023-01-01",
+      "fieldHints": {
+        "hotelName": "name_ru",
+        "address": "address",
+        "rating": "rating",
+        "rubrics": "rubrics",
+        "reviewText": "text",
+        "reviewDate": null
+      },
+      "notes": "Дата отзыва не дана на уровне строки. Для MVP применяется snapshotDate и метка inferred."
+    },
+    {
+      "id": "kaggle:michaelstepanovsky/hotel-data",
+      "provider": "kaggle",
+      "role": [
+        "catalog_enrichment"
+      ],
+      "localPath": "data/external/kaggle/ostrovok-hotels/hotel_data.csv",
+      "format": "csv",
+      "encoding": "utf-8",
+      "fieldHints": {
+        "hotelName": "Hotel Name",
+        "rating": "Rating",
+        "reviewsCount": "Number of Reviews",
+        "description": "Description"
+      },
+      "notes": "Используется только как дополнительный справочник; адреса и отдельные тексты отзывов отсутствуют."
+    },
+    {
+      "id": "kaggle:yeazal/2gis-reviews",
+      "provider": "kaggle",
+      "role": [
+        "candidate_reviews"
+      ],
+      "localPath": "data/external/kaggle/2gis-reviews/Reviews.csv",
+      "format": "csv",
+      "encoding": "utf-8",
+      "fieldHints": {
+        "reviewText": "Review",
+        "sentimentLabel": "Label"
+      },
+      "notes": "В текущем виде нет устойчивой привязки к объекту размещения (hotel identity), поэтому источник обычно отклоняется."
+    }
+  ]
+}

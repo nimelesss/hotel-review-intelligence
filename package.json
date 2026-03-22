@@ -8,19 +8,29 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "catalog:refresh": "node scripts/build-russia-hotels-catalog.mjs"
+    "catalog:refresh": "node scripts/build-russia-hotels-catalog.mjs",
+    "datasets:discover": "node scripts/discover-open-datasets.mjs",
+    "datasets:profile": "node scripts/profile-open-datasets.mjs",
+    "datasets:import": "node scripts/import-open-datasets-to-sqlite.mjs",
+    "datasets:prepare": "npm run datasets:discover && npm run datasets:profile && npm run datasets:import",
+    "db:migrate": "node scripts/db-migrate.mjs"
   },
   "dependencies": {
+    "better-sqlite3": "^12.8.0",
     "clsx": "^2.1.1",
+    "csv-parse": "^6.2.1",
     "date-fns": "^3.6.0",
     "next": "^15.3.0",
+    "pg": "^8.20.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "recharts": "^2.15.1",
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.15.21",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19.1.5",
     "@types/react-dom": "^19.1.5",
     "autoprefixer": "^10.4.20",

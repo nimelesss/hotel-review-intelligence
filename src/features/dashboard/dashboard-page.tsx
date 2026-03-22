@@ -194,6 +194,23 @@ export function DashboardPage() {
     setSearchError(null);
     setSyncMessage(null);
     try {
+      const existing = hotels.find((hotel) => {
+        const sameId = hotel.id === candidate.externalId;
+        const sameExternal = !!hotel.externalId && hotel.externalId === candidate.externalId;
+        const sameNameCity =
+          normalizeKey(hotel.name) === normalizeKey(candidate.name) &&
+          normalizeKey(hotel.city) === normalizeKey(candidate.city);
+        return sameId || sameExternal || sameNameCity;
+      });
+
+      if (existing) {
+        setSelectedHotelId(existing.id);
+        setSyncMessage(`Открыт существующий профиль: ${existing.name}.`);
+        setSearchResults([]);
+        setSearchQuery(`${existing.name}, ${existing.city}`);
+        return;
+      }
+
       const response = await fetchJson<CreateHotelResponse>("/api/hotels", {
         method: "POST",
         body: JSON.stringify({
@@ -751,4 +768,8 @@ function translatePriority(priority: string): string {
     high: "Высокий"
   };
   return map[priority] || priority;
+}
+
+function normalizeKey(value: string): string {
+  return value.toLocaleLowerCase("ru-RU").replace(/\s+/g, " ").trim();
 }
