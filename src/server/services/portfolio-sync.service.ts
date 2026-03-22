@@ -350,6 +350,23 @@ function bootstrapFromCanonicalLocalHotelIfNeeded(hotel: Hotel): AnalysisRun | n
 }
 
 function findCanonicalDonorHotel(hotel: Hotel, hotels: Hotel[]): Hotel | null {
+  if (hotel.externalId) {
+    const donorById = hotels.find(
+      (candidate) => candidate.id === hotel.externalId && (candidate.reviewCount ?? 0) > 0
+    );
+    if (donorById) {
+      return donorById;
+    }
+
+    const donorByExternal = hotels.find(
+      (candidate) =>
+        candidate.externalId === hotel.externalId && (candidate.reviewCount ?? 0) > 0
+    );
+    if (donorByExternal) {
+      return donorByExternal;
+    }
+  }
+
   const hotelName = normalizeIdentity(hotel.name);
   const hotelCity = normalizeIdentity(hotel.city);
   if (!hotelName) {
@@ -362,7 +379,7 @@ function findCanonicalDonorHotel(hotel: Hotel, hotels: Hotel[]): Hotel | null {
       candidate,
       score: scoreDonorCandidate(hotelName, hotelCity, candidate)
     }))
-    .filter((item) => item.score >= 100)
+    .filter((item) => item.score >= 75)
     .sort((a, b) => b.score - a.score);
 
   return candidates[0]?.candidate ?? null;
@@ -393,13 +410,56 @@ function scoreDonorCandidate(
 }
 
 function normalizeIdentity(value: string): string {
-  return value
+  const normalized = value
     .toLocaleLowerCase("ru-RU")
     .replace(/\u0451/g, "\u0435")
     .replace(/[^\p{L}\p{N}\s-]+/gu, " ")
-    .replace(/\b(отель|гостиница|hotel|hostel|by|marriott)\b/gu, " ")
+    .replace(/\b(отель|гостиница|hotel|hostel|by|marriott|inn|resort)\b/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+  const transliterated = transliterateCyrillicToLatin(normalized);
+  return [normalized, transliterated].join(" ").trim();
+}
+
+function transliterateCyrillicToLatin(value: string): string {
+  const map: Record<string, string> = {
+    а: "a",
+    б: "b",
+    в: "v",
+    г: "g",
+    д: "d",
+    е: "e",
+    ё: "e",
+    ж: "zh",
+    з: "z",
+    и: "i",
+    й: "y",
+    к: "k",
+    л: "l",
+    м: "m",
+    н: "n",
+    о: "o",
+    п: "p",
+    р: "r",
+    с: "s",
+    т: "t",
+    у: "u",
+    ф: "f",
+    х: "h",
+    ц: "ts",
+    ч: "ch",
+    ш: "sh",
+    щ: "sch",
+    ъ: "",
+    ы: "y",
+    ь: "",
+    э: "e",
+    ю: "yu",
+    я: "ya"
+  };
+
+  return [...value].map((char) => map[char] ?? char).join("");
 }
 
 function runLocalReanalysisIfPossible(
