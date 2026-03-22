@@ -127,9 +127,9 @@ export function UploadPage() {
     try {
       const hotelsResponse = await fetchJson<HotelListResponse>("/api/hotels");
       setHotels(hotelsResponse.items);
-      if (hotelsResponse.items[0]) {
-        setSelectedHotelId((prev) => prev || hotelsResponse.items[0].id);
-      }
+      setSelectedHotelId((prev) =>
+        hotelsResponse.items.some((hotel) => hotel.id === prev) ? prev : ""
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось загрузить отели.");
     } finally {
@@ -378,6 +378,7 @@ export function UploadPage() {
             value={selectedHotelId}
             onChange={(event) => setSelectedHotelId(event.target.value)}
           >
+            <option value="">Выберите отель</option>
             {hotels.map((hotel) => (
               <option key={hotel.id} value={hotel.id}>
                 {hotel.name}
@@ -441,6 +442,7 @@ export function UploadPage() {
             value={selectedHotelId}
             onChange={(event) => setSelectedHotelId(event.target.value)}
           >
+            <option value="">Выберите отель</option>
             {hotels.map((hotel) => (
               <option key={hotel.id} value={hotel.id}>
                 {hotel.name}

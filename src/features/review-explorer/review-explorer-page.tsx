@@ -67,11 +67,10 @@ export function ReviewExplorerPage() {
       try {
         const response = await fetchJson<HotelListResponse>("/api/hotels");
         setHotels(response.items);
-        if (response.items[0]) {
-          setSelectedHotelId(response.items[0].id);
-        } else {
-          setLoading(false);
-        }
+        setSelectedHotelId((prev) =>
+          response.items.some((hotel) => hotel.id === prev) ? prev : ""
+        );
+        setLoading(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Ошибка загрузки отелей.");
         setLoading(false);
@@ -82,6 +81,9 @@ export function ReviewExplorerPage() {
 
   useEffect(() => {
     if (!selectedHotelId) {
+      setResult(null);
+      setSelectedReviewId(null);
+      setLoading(false);
       return;
     }
     const loadReviews = async () => {
@@ -144,6 +146,7 @@ export function ReviewExplorerPage() {
             value={selectedHotelId}
             onChange={(event) => setSelectedHotelId(event.target.value)}
           >
+            <option value="">Выберите отель</option>
             {hotels.map((hotel) => (
               <option key={hotel.id} value={hotel.id}>
                 {hotel.name}
@@ -292,6 +295,12 @@ export function ReviewExplorerPage() {
 
       {loading && !result ? <LoadingState label="Загружаю отзывы..." /> : null}
       {error && !result ? <ErrorState title="Ошибка загрузки" description={error} /> : null}
+      {!selectedHotelId && !loading ? (
+        <EmptyState
+          title="Выберите отель для просмотра отзывов"
+          description="Сначала выберите объект в фильтре, затем применяйте тональность, темы и сегменты."
+        />
+      ) : null}
 
       {!loading && result && result.total === 0 ? (
         <EmptyState

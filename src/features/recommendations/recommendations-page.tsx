@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { Hotel, RecommendationPayload } from "@/entities/types";
@@ -29,11 +29,10 @@ export function RecommendationsPage() {
       try {
         const response = await fetchJson<HotelListResponse>("/api/hotels");
         setHotels(response.items);
-        if (response.items[0]) {
-          setSelectedHotelId(response.items[0].id);
-        } else {
-          setLoading(false);
-        }
+        setSelectedHotelId((prev) =>
+          response.items.some((hotel) => hotel.id === prev) ? prev : ""
+        );
+        setLoading(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Ошибка загрузки отелей.");
         setLoading(false);
@@ -44,8 +43,11 @@ export function RecommendationsPage() {
 
   useEffect(() => {
     if (!selectedHotelId) {
+      setPayload(null);
+      setLoading(false);
       return;
     }
+
     const loadRecommendations = async () => {
       setLoading(true);
       setError(null);
@@ -60,21 +62,43 @@ export function RecommendationsPage() {
         setLoading(false);
       }
     };
+
     void loadRecommendations();
   }, [selectedHotelId]);
 
   if ((loading && !payload) || stalePayload) {
     return <LoadingState label="Формирую рекомендации..." />;
   }
+
   if (error && !payload) {
     return <ErrorState title="Ошибка рекомендаций" description={error} />;
   }
+
   if (!payload) {
     return (
-      <ErrorState
-        title="Рекомендации отсутствуют"
-        description="Не удалось получить рекомендации по выбранному отелю."
-      />
+      <div className="space-y-6">
+        <PageHeader
+          title="Рекомендации"
+          subtitle="Приоритизированные действия с прозрачным бизнес-обоснованием."
+          rightSlot={
+            <Select
+              value={selectedHotelId}
+              onChange={(event) => setSelectedHotelId(event.target.value)}
+            >
+              <option value="">Выберите отель</option>
+              {hotels.map((hotel) => (
+                <option key={hotel.id} value={hotel.id}>
+                  {hotel.name}
+                </option>
+              ))}
+            </Select>
+          }
+        />
+        <EmptyState
+          title="Выберите отель для рекомендаций"
+          description="После выбора объекта система покажет приоритизированные действия по маркетингу, сервису и репутации."
+        />
+      </div>
     );
   }
 
@@ -85,6 +109,7 @@ export function RecommendationsPage() {
         subtitle="Приоритизированные действия с прозрачным бизнес-обоснованием."
         rightSlot={
           <Select value={selectedHotelId} onChange={(event) => setSelectedHotelId(event.target.value)}>
+            <option value="">Выберите отель</option>
             {hotels.map((hotel) => (
               <option key={hotel.id} value={hotel.id}>
                 {hotel.name}

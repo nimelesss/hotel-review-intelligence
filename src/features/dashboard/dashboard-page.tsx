@@ -68,11 +68,8 @@ export function DashboardPage() {
         const response = await fetchJson<HotelListResponse>("/api/hotels");
         setHotels(response.items);
         setSelectedHotelId((prev) => {
-          if (!response.items.length) {
-            return "";
-          }
           const prevExists = response.items.some((hotel) => hotel.id === prev);
-          return prevExists ? prev : response.items[0].id;
+          return prevExists ? prev : "";
         });
         if (!response.items.length) {
           setDashboard(null);
@@ -87,6 +84,8 @@ export function DashboardPage() {
 
   useEffect(() => {
     if (!selectedHotelId) {
+      setDashboard(null);
+      setError(null);
       setLoading(false);
       return;
     }
@@ -106,13 +105,7 @@ export function DashboardPage() {
           normalizedMessage.includes("отель не найден") ||
           normalizedMessage.includes("hotel not found")
         ) {
-          setSelectedHotelId((current) => {
-            const fallback = hotels[0]?.id || "";
-            if (fallback && fallback !== current) {
-              return fallback;
-            }
-            return "";
-          });
+          setSelectedHotelId("");
           setDashboard(null);
           setError(null);
           return;

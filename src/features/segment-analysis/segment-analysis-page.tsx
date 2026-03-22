@@ -10,7 +10,7 @@ import { Badge } from "@/shared/ui/badge";
 import { Card, CardTitle } from "@/shared/ui/card";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Select } from "@/shared/ui/select";
-import { ErrorState, LoadingState } from "@/shared/ui/states";
+import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/states";
 import { SegmentDistributionChart } from "@/widgets/charts/segment-distribution-chart";
 
 interface HotelListResponse {
@@ -29,11 +29,10 @@ export function SegmentAnalysisPage() {
       try {
         const response = await fetchJson<HotelListResponse>("/api/hotels");
         setHotels(response.items);
-        if (response.items[0]) {
-          setSelectedHotelId(response.items[0].id);
-        } else {
-          setLoading(false);
-        }
+        setSelectedHotelId((prev) =>
+          response.items.some((hotel) => hotel.id === prev) ? prev : ""
+        );
+        setLoading(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Ошибка загрузки отелей.");
         setLoading(false);
@@ -44,8 +43,11 @@ export function SegmentAnalysisPage() {
 
   useEffect(() => {
     if (!selectedHotelId) {
+      setPayload(null);
+      setLoading(false);
       return;
     }
+
     const loadPayload = async () => {
       setLoading(true);
       setError(null);
@@ -60,16 +62,47 @@ export function SegmentAnalysisPage() {
         setLoading(false);
       }
     };
+
     void loadPayload();
   }, [selectedHotelId]);
 
   if (loading && !payload) {
     return <LoadingState label="Формирую сегментный профиль..." />;
   }
+
   if (error && !payload) {
     return <ErrorState title="Ошибка сегментного анализа" description={error} />;
   }
+
   if (!payload) {
+    if (!selectedHotelId) {
+      return (
+        <div className="space-y-6">
+          <PageHeader
+            title="Сегменты"
+            subtitle="Вероятностная сегментация гостей и бизнес-смысл каждого сегмента."
+            rightSlot={
+              <Select
+                value={selectedHotelId}
+                onChange={(event) => setSelectedHotelId(event.target.value)}
+              >
+                <option value="">Выберите отель</option>
+                {hotels.map((hotel) => (
+                  <option key={hotel.id} value={hotel.id}>
+                    {hotel.name}
+                  </option>
+                ))}
+              </Select>
+            }
+          />
+          <EmptyState
+            title="Выберите отель для сегментного анализа"
+            description="Выберите объект в списке, чтобы открыть структуру аудитории и сегментные инсайты."
+          />
+        </div>
+      );
+    }
+
     return (
       <ErrorState
         title="Сегментные данные отсутствуют"
@@ -88,6 +121,7 @@ export function SegmentAnalysisPage() {
             value={selectedHotelId}
             onChange={(event) => setSelectedHotelId(event.target.value)}
           >
+            <option value="">Выберите отель</option>
             {hotels.map((hotel) => (
               <option key={hotel.id} value={hotel.id}>
                 {hotel.name}
