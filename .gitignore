@@ -11,3 +11,4 @@ data/open-datasets/discovery-report.json
 data/open-datasets/profile-report.json
 data/open-datasets/import-summary.json
 tmp_hf_info.json
+.hotel-search-cache.json
