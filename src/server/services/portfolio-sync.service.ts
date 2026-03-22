@@ -4,9 +4,12 @@ import {
   PlatformIngestionRequest,
   PlatformProvider
 } from "@/entities/types";
+import { ANALYSIS_VERSION } from "@/shared/config/constants";
+import { runAnalysisForHotel } from "@/server/analytics/run-analysis";
 import { getRepository } from "@/server/repositories";
 import { startPlatformIngestionRun } from "@/server/services/intelligence.service";
 import { canFetchWithoutDatasetUrl } from "@/server/platform-fetch/providers/apify-dataset";
+import { createId } from "@/shared/lib/id";
 
 type SyncMode = "manual" | "weekly";
 
@@ -212,7 +215,7 @@ export function startRealtimeSyncForHotel(hotelIdRaw: string): PortfolioSyncResu
   const hotelId = hotelIdRaw.trim();
   const hotel = hotelId ? repository.getHotelById(hotelId) : undefined;
   if (!hotel) {
-    throw new Error("hotelId не найден.");
+    throw new Error("hotelId not found.");
   }
 
   const explicitTargets = readPortfolioTargets().filter((target) => target.enabled);
@@ -231,28 +234,86 @@ export function startRealtimeSyncForHotel(hotelIdRaw: string): PortfolioSyncResu
   } else {
     const fallbackTargets = readFallbackTargets().filter((target) => target.enabled);
     if (!fallbackTargets.length) {
-      throw new Error(
-        "Для этого отеля нет настроенных источников. Добавьте PORTFOLIO_SYNC_TARGETS_JSON или DEFAULT_REALTIME_TARGETS_JSON."
+      const localRun = runLocalReanalysisIfPossible(
+        hotel.id,
+        "External providers are not configured. Analytics recalculated from local review store."
       );
-    }
-
-    fallbackTargets.forEach((target) => {
-      const run = runFallbackForHotel(hotel, target, warnings);
-      if (run) {
-        runs.push(run);
+      if (localRun) {
+        runs.push(localRun);
+      } else {
+        warnings.push(
+          "External providers are not configured, and selected hotel has no local reviews yet."
+        );
       }
-    });
+    } else {
+      fallbackTargets.forEach((target) => {
+        const run = runFallbackForHotel(hotel, target, warnings);
+        if (run) {
+          runs.push(run);
+        }
+      });
+    }
+  }
+
+  if (!runs.length) {
+    const localRun = runLocalReanalysisIfPossible(
+      hotel.id,
+      "External sources are unavailable. Analytics recalculated from local review store."
+    );
+    if (localRun) {
+      runs.push(localRun);
+      warnings.push("External sources unavailable: local analytics recalculation completed.");
+    }
   }
 
   return {
     mode: "manual",
     startedAt: new Date().toISOString(),
-    targetsTotal: runs.length,
+    targetsTotal: Math.max(runs.length, 1),
     targetsStarted: runs.length,
     hotelsCovered: runs.length ? 1 : 0,
     runs,
     warnings
   };
+}
+
+function runLocalReanalysisIfPossible(
+  hotelId: string,
+  notes: string
+): AnalysisRun | null {
+  const repository = getRepository();
+  const existingReviews = repository.listReviewsByHotel(hotelId);
+  if (!existingReviews.length) {
+    return null;
+  }
+
+  const outcome = runAnalysisForHotel(hotelId, existingReviews, "seed");
+  const now = new Date().toISOString();
+  const run: AnalysisRun = {
+    id: createId("run-local-rebuild"),
+    hotelId,
+    sourceType: "seed",
+    totalReviewsProcessed: existingReviews.length,
+    status: "completed",
+    startedAt: now,
+    completedAt: now,
+    analysisVersion: ANALYSIS_VERSION,
+    notes,
+    progressPct: 100,
+    stage: "completed",
+    fetchedReviews: existingReviews.length
+  };
+
+  repository.upsertAnalytics(
+    hotelId,
+    existingReviews,
+    outcome.analyses,
+    outcome.aggregate,
+    outcome.recommendations,
+    run
+  );
+
+  return run;
 }
 
 function resolveHotelsScope(allHotels: Hotel[], hotelIds?: string[]): Hotel[] {

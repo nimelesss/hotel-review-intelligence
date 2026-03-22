@@ -148,7 +148,7 @@ export function DashboardPage() {
 
     try {
       const response = await fetchJson<SearchHotelsResponse>(
-        `/api/hotels/search?q=${encodeURIComponent(query)}&limit=8`
+        `/api/hotels/search?q=${encodeURIComponent(query)}&limit=20`
       );
       setSearchResults(response.items);
 
@@ -257,12 +257,20 @@ export function DashboardPage() {
         method: "POST",
         body: JSON.stringify({ hotelId: selectedHotelId })
       });
-      const warningText = response.result.warnings.length
-        ? ` Предупреждения: ${response.result.warnings.join(" | ")}`
-        : "";
-      setSyncMessage(
-        `Запущен сбор по источникам: ${response.result.targetsStarted}.${warningText}`
-      );
+      const warningsCount = response.result.warnings.length;
+      if (response.result.targetsStarted > 0) {
+        setSyncMessage(
+          warningsCount > 0
+            ? `Started jobs: ${response.result.targetsStarted}. Warnings: ${warningsCount}.`
+            : `Started jobs: ${response.result.targetsStarted}.`
+        );
+      } else {
+        setSyncMessage(
+          warningsCount > 0
+            ? `No jobs started. Warnings: ${warningsCount}.`
+            : "No jobs started: no available sources for selected hotel."
+        );
+      }
       setReloadKey((prev) => prev + 1);
     } catch (err) {
       setSearchError(
