@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { APP_NAME } from "@/shared/config/constants";
+import { ThemeModeSwitcher } from "@/widgets/layout/theme-mode-switcher";
 
 const NAV_LINKS = [
   { href: "/", label: "Сводка" },
@@ -19,16 +20,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
       <div className="mx-auto grid max-w-[1600px] grid-cols-1 gap-4 p-4 lg:grid-cols-[260px_1fr]">
         <aside className="anim-fade-up rounded-xl2 border border-border bg-panel p-4 shadow-panel lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]">
-          <div className="mb-6 border-b border-border pb-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-textMuted">
-              B2B SaaS
-            </p>
+          <div className="mb-4 border-b border-border pb-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-textMuted">B2B SaaS</p>
             <h2 className="mt-2 text-lg font-bold text-text">{APP_NAME}</h2>
             <p className="mt-2 text-xs text-textMuted">
-              Аналитика отзывов для управления гостиницей
+              Аналитика отзывов для управленческих решений в гостиничном бизнесе
             </p>
           </div>
-          <nav className="space-y-1">
+
+          <ThemeModeSwitcher />
+
+          <nav className="mt-4 space-y-1">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
@@ -39,8 +41,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
           </nav>
+
           <div className="mt-6 rounded-lg border border-border bg-panelMuted p-3 text-xs text-textMuted">
-            Версия MVP: приоритет на управленческие решения по реальным отзывам.
+            Версия MVP: фокус на реальной управленческой аналитике, а не на демонстрационных
+            данных.
           </div>
         </aside>
         <main className="pb-8">{children}</main>
