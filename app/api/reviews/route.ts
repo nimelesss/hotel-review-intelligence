@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server";
 import { ReviewSource, SegmentId, SentimentLabel, TopicId } from "@/entities/types";
-import { getRepository } from "@/server/repositories";
-import { resolveHotelId } from "@/server/services/intelligence.service";
+import { queryHotelReviews } from "@/server/services/intelligence.service";
 
 export async function GET(request: Request) {
-  const repository = getRepository();
   const { searchParams } = new URL(request.url);
-  const hotelId = resolveHotelId(searchParams.get("hotelId") ?? undefined);
-
-  const result = repository.queryReviews({
-    hotelId,
+  const result = queryHotelReviews({
+    hotelId: searchParams.get("hotelId") ?? undefined,
     sentiment: castSentiment(searchParams.get("sentiment")),
     segment: castSegment(searchParams.get("segment")),
     topic: castTopic(searchParams.get("topic")),

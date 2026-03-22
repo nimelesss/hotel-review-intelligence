@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { getSegmentPayload } from "@/server/services/intelligence.service";
-
-export async function GET(_: Request, context: any) {
+export async function GET(
+  _: Request,
+  context: { params: Promise<{ hotelId: string }> }
+) {
   try {
-    const params = context?.params ?? {};
+    const params = await context.params;
     const { hotelId } = params;
     const payload = getSegmentPayload(hotelId);
     return NextResponse.json(payload);

@@ -9,6 +9,7 @@ import {
   PlatformIngestionRequest,
   RecommendationPayload,
   Review,
+  ReviewsQuery,
   ReviewSource,
   SegmentAnalyticsPayload,
   SentimentLabel,
@@ -102,6 +103,18 @@ export function getRecommendationPayload(hotelIdRaw?: string): RecommendationPay
     hotel,
     recommendations
   };
+}
+
+export function queryHotelReviews(
+  query: Omit<ReviewsQuery, "hotelId"> & { hotelId?: string }
+) {
+  const repository = getRepository();
+  const hotelId = resolveHotelId(query.hotelId);
+  ensureHotelAnalytics(hotelId);
+  return repository.queryReviews({
+    ...query,
+    hotelId
+  });
 }
 
 export function previewIngestion(request: IngestionImportRequest): IngestionPreviewResult {
@@ -294,12 +307,21 @@ async function executePlatformIngestion(
 
 function ensureHotelAnalytics(hotelId: string) {
   const repository = getRepository();
-  const existing = repository.getAggregateByHotel(hotelId);
-  if (existing) {
-    return existing;
+  const currentReviews = repository.listReviewsByHotel(hotelId);
+  const currentAnalyses = repository.listAnalysesByHotel(hotelId);
+  const currentRecommendations = repository.listRecommendationsByHotel(hotelId);
+  const currentAggregate = repository.getAggregateByHotel(hotelId);
+
+  const aggregateMissing = !currentAggregate;
+  const totalsMismatch =
+    !!currentAggregate && currentAggregate.totalReviews !== currentReviews.length;
+  const analysesMismatch = currentAnalyses.length !== currentReviews.length;
+  const recommendationsMissing = currentRecommendations.length === 0;
+
+  if (!aggregateMissing && !totalsMismatch && !analysesMismatch && !recommendationsMissing) {
+    return currentAggregate;
   }
 
-  const currentReviews = repository.listReviewsByHotel(hotelId);
   const outcome = runAnalysisForHotel(hotelId, currentReviews, "seed");
   repository.upsertAnalytics(
     hotelId,
@@ -309,7 +331,7 @@ function ensureHotelAnalytics(hotelId: string) {
     outcome.recommendations,
     outcome.run
   );
-  return repository.getAggregateByHotel(hotelId);
+  return outcome.aggregate;
 }
 
 function buildExecutiveSummary(aggregate: DashboardPayload["aggregate"]): ExecutiveSummary {

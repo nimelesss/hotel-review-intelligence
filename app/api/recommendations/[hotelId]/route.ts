@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { getRecommendationPayload } from "@/server/services/intelligence.service";
-
-export async function GET(_: Request, context: any) {
+export async function GET(
+  _: Request,
+  context: { params: Promise<{ hotelId: string }> }
+) {
   try {
-    const params = context?.params ?? {};
+    const params = await context.params;
     const { hotelId } = params;
     const payload = getRecommendationPayload(hotelId);
     return NextResponse.json(payload);
