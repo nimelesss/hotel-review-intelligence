@@ -57,10 +57,13 @@ export function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<HotelSearchResult[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [suppressNextAutoSearch, setSuppressNextAutoSearch] = useState(false);
 
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [pendingScrollToStats, setPendingScrollToStats] = useState(false);
 
   useEffect(() => {
     const loadHotels = async () => {
@@ -142,7 +145,8 @@ export function DashboardPage() {
         setSearchError("Введите минимум 2 символа.");
       }
       setSearchResults([]);
-      return;
+      setShowSearchResults(false);
+      return [] as HotelSearchResult[];
     }
 
     setSearching(true);
@@ -156,12 +160,14 @@ export function DashboardPage() {
         `/api/hotels/search?q=${encodeURIComponent(query)}&limit=20`
       );
       setSearchResults(response.items);
+      setShowSearchResults(true);
 
       if (!response.items.length && !silent) {
         setSearchError(
           "По этому запросу отели не найдены. Уточните объект и город, например: «Courtyard by Marriott Ростов-на-Дону»."
         );
       }
+      return response.items;
     } catch (err) {
       if (!silent) {
         setSearchError(
@@ -170,6 +176,7 @@ export function DashboardPage() {
             : "Поиск временно недоступен."
         );
       }
+      return [] as HotelSearchResult[];
     } finally {
       setSearching(false);
     }
@@ -179,19 +186,67 @@ export function DashboardPage() {
     const query = searchQuery.trim();
     if (query.length < 2) {
       setSearchResults([]);
+      setShowSearchResults(false);
       setSearchError(null);
       return;
     }
+    if (suppressNextAutoSearch) {
+      setSuppressNextAutoSearch(false);
+      return;
+    }
+    setShowSearchResults(true);
 
     const timer = setTimeout(() => {
       void searchHotelsByQuery(query, true);
     }, SEARCH_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, searchHotelsByQuery]);
+  }, [searchQuery, searchHotelsByQuery, suppressNextAutoSearch]);
+
+  useEffect(() => {
+    if (!pendingScrollToStats || !selectedHotelId || !dashboard) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      const anchor = document.getElementById("dashboard-stats-anchor");
+      anchor?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setPendingScrollToStats(false);
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [pendingScrollToStats, selectedHotelId, dashboard]);
 
   const onSearchHotels = async () => {
-    await searchHotelsByQuery(searchQuery, false);
+    const items = await searchHotelsByQuery(searchQuery, false);
+    const normalizedQuery = normalizeKey(searchQuery);
+    const exactMatch = items.find((item) => {
+      const name = normalizeKey(item.name);
+      const nameCity = normalizeKey(`${item.name}, ${item.city}`);
+      const nameCityCompact = normalizeKey(`${item.name} ${item.city}`);
+      return (
+        name === normalizedQuery ||
+        nameCity === normalizedQuery ||
+        nameCityCompact === normalizedQuery
+      );
+    });
+
+    if (exactMatch) {
+      await onCreateHotelFromSearch(exactMatch);
+      return;
+    }
+
+    if (selectedHotelId && selectedHotel) {
+      const selectedName = normalizeKey(selectedHotel.name);
+      const selectedNameCity = normalizeKey(`${selectedHotel.name}, ${selectedHotel.city}`);
+      if (
+        selectedName === normalizedQuery ||
+        selectedNameCity === normalizedQuery ||
+        normalizedQuery.includes(selectedName)
+      ) {
+        setShowSearchResults(false);
+        setSearchResults([]);
+        setPendingScrollToStats(true);
+      }
+    }
   };
 
   const onCreateHotelFromSearch = async (candidate: HotelSearchResult) => {
@@ -212,7 +267,10 @@ export function DashboardPage() {
         setSelectedHotelId(existing.id);
         setSyncMessage(`Открыт существующий профиль: ${existing.name}.`);
         setSearchResults([]);
+        setShowSearchResults(false);
+        setSuppressNextAutoSearch(true);
         setSearchQuery(`${existing.name}, ${existing.city}`);
+        setPendingScrollToStats(true);
         return;
       }
 
@@ -240,7 +298,10 @@ export function DashboardPage() {
       setSelectedHotelId(response.item.id);
       setSyncMessage(`Профиль отеля добавлен: ${response.item.name}.`);
       setSearchResults([]);
+      setShowSearchResults(false);
+      setSuppressNextAutoSearch(true);
       setSearchQuery(`${response.item.name}, ${response.item.city}`);
+      setPendingScrollToStats(true);
     } catch (err) {
       setSearchError(
         err instanceof Error ? err.message : "Не удалось добавить профиль отеля."
@@ -301,9 +362,13 @@ export function DashboardPage() {
       <div className="space-y-6">
         <SearchHero
           searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
+          setSearchQuery={(value) => {
+            setSearchQuery(value);
+            setSuppressNextAutoSearch(false);
+          }}
           onSearchHotels={onSearchHotels}
           searching={searching}
+          showSearchResults={showSearchResults}
           searchResults={searchResults}
           onCreateHotelFromSearch={onCreateHotelFromSearch}
           searchError={searchError}
@@ -341,14 +406,19 @@ export function DashboardPage() {
     <div className="space-y-6">
       <SearchHero
         searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
+        setSearchQuery={(value) => {
+          setSearchQuery(value);
+          setSuppressNextAutoSearch(false);
+        }}
         onSearchHotels={onSearchHotels}
         searching={searching}
+        showSearchResults={showSearchResults}
         searchResults={searchResults}
         onCreateHotelFromSearch={onCreateHotelFromSearch}
         searchError={searchError}
         busy={syncBusy}
       />
+      <div id="dashboard-stats-anchor" className="scroll-mt-4" />
 
       <PageHeader
         title={APP_NAME}
@@ -668,6 +738,7 @@ function SearchHero(props: {
   setSearchQuery: (value: string) => void;
   onSearchHotels: () => Promise<void>;
   searching: boolean;
+  showSearchResults: boolean;
   searchResults: HotelSearchResult[];
   onCreateHotelFromSearch: (candidate: HotelSearchResult) => Promise<void>;
   searchError: string | null;
@@ -678,6 +749,7 @@ function SearchHero(props: {
     setSearchQuery,
     onSearchHotels,
     searching,
+    showSearchResults,
     searchResults,
     onCreateHotelFromSearch,
     searchError,
@@ -723,7 +795,7 @@ function SearchHero(props: {
 
       {searchError ? <p className="mt-3 text-sm text-danger">{searchError}</p> : null}
 
-      {searchResults.length > 0 ? (
+      {showSearchResults && searchResults.length > 0 ? (
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           {searchResults.map((item) => (
             <article
