@@ -4,10 +4,10 @@ type Variant = "default" | "success" | "warning" | "danger" | "info";
 
 const variantClass: Record<Variant, string> = {
   default: "bg-panelMuted text-text border-border",
-  success: "bg-green-50 text-success border-green-200",
-  warning: "bg-amber-50 text-warning border-amber-200",
-  danger: "bg-red-50 text-danger border-red-200",
-  info: "bg-blue-50 text-info border-blue-200"
+  success: "bg-panelMuted text-success border-border",
+  warning: "bg-panelMuted text-warning border-border",
+  danger: "bg-panelMuted text-danger border-border",
+  info: "bg-panelMuted text-info border-border"
 };
 
 export function Badge({

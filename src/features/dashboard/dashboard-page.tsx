@@ -59,7 +59,7 @@ export function DashboardPage() {
   const [searchResults, setSearchResults] = useState<HotelSearchResult[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [suppressNextAutoSearch, setSuppressNextAutoSearch] = useState(false);
+  const [searchLockQuery, setSearchLockQuery] = useState<string | null>(null);
 
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
@@ -126,6 +126,19 @@ export function DashboardPage() {
     [hotels, selectedHotelId]
   );
 
+  const onSearchInputChange = useCallback(
+    (value: string) => {
+      setSearchQuery(value);
+      if (
+        searchLockQuery &&
+        normalizeKey(value) !== normalizeKey(searchLockQuery)
+      ) {
+        setSearchLockQuery(null);
+      }
+    },
+    [searchLockQuery]
+  );
+
   useEffect(() => {
     if (!dashboard?.latestRun || dashboard.latestRun.status !== "running") {
       return;
@@ -190,8 +203,7 @@ export function DashboardPage() {
       setSearchError(null);
       return;
     }
-    if (suppressNextAutoSearch) {
-      setSuppressNextAutoSearch(false);
+    if (searchLockQuery && normalizeKey(query) === normalizeKey(searchLockQuery)) {
       return;
     }
     setShowSearchResults(true);
@@ -201,7 +213,7 @@ export function DashboardPage() {
     }, SEARCH_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, searchHotelsByQuery, suppressNextAutoSearch]);
+  }, [searchQuery, searchHotelsByQuery, searchLockQuery]);
 
   useEffect(() => {
     if (!pendingScrollToStats || !selectedHotelId || !dashboard) {
@@ -244,6 +256,7 @@ export function DashboardPage() {
       ) {
         setShowSearchResults(false);
         setSearchResults([]);
+        setSearchLockQuery(searchQuery);
         setPendingScrollToStats(true);
       }
     }
@@ -254,22 +267,16 @@ export function DashboardPage() {
     setSearchError(null);
     setSyncMessage(null);
     try {
-      const existing = hotels.find((hotel) => {
-        const sameId = hotel.id === candidate.externalId;
-        const sameExternal = !!hotel.externalId && hotel.externalId === candidate.externalId;
-        const sameNameCity =
-          normalizeKey(hotel.name) === normalizeKey(candidate.name) &&
-          normalizeKey(hotel.city) === normalizeKey(candidate.city);
-        return sameId || sameExternal || sameNameCity;
-      });
+      const existing = findBestExistingHotel(hotels, candidate);
 
       if (existing) {
+        const nextQuery = `${existing.name}, ${existing.city}`;
         setSelectedHotelId(existing.id);
         setSyncMessage(`Открыт существующий профиль: ${existing.name}.`);
         setSearchResults([]);
         setShowSearchResults(false);
-        setSuppressNextAutoSearch(true);
-        setSearchQuery(`${existing.name}, ${existing.city}`);
+        setSearchLockQuery(nextQuery);
+        setSearchQuery(nextQuery);
         setPendingScrollToStats(true);
         return;
       }
@@ -295,12 +302,13 @@ export function DashboardPage() {
         map.set(response.item.id, response.item);
         return [...map.values()];
       });
+      const nextQuery = `${response.item.name}, ${response.item.city}`;
       setSelectedHotelId(response.item.id);
       setSyncMessage(`Профиль отеля добавлен: ${response.item.name}.`);
       setSearchResults([]);
       setShowSearchResults(false);
-      setSuppressNextAutoSearch(true);
-      setSearchQuery(`${response.item.name}, ${response.item.city}`);
+      setSearchLockQuery(nextQuery);
+      setSearchQuery(nextQuery);
       setPendingScrollToStats(true);
     } catch (err) {
       setSearchError(
@@ -315,13 +323,23 @@ export function DashboardPage() {
     if (!selectedHotelId) {
       return;
     }
+    const effectiveHotel = resolveSyncHotelSelection(selectedHotelId, hotels);
+    if (!effectiveHotel) {
+      setSearchError("Выбранный отель не найден. Обновите список отелей и попробуйте снова.");
+      return;
+    }
+
     setSyncBusy(true);
     setSyncMessage(null);
     setSearchError(null);
     try {
+      if (effectiveHotel.id !== selectedHotelId) {
+        setSelectedHotelId(effectiveHotel.id);
+        setSyncMessage(`Для анализа выбран профиль с отзывами: ${effectiveHotel.name}.`);
+      }
       const response = await fetchJson<RealtimeSyncResponse>("/api/sync/realtime-hotel", {
         method: "POST",
-        body: JSON.stringify({ hotelId: selectedHotelId })
+        body: JSON.stringify({ hotelId: effectiveHotel.id })
       });
       const warningsCount = response.result.warnings.length;
       if (response.result.targetsStarted > 0) {
@@ -362,10 +380,7 @@ export function DashboardPage() {
       <div className="space-y-6">
         <SearchHero
           searchQuery={searchQuery}
-          setSearchQuery={(value) => {
-            setSearchQuery(value);
-            setSuppressNextAutoSearch(false);
-          }}
+          setSearchQuery={onSearchInputChange}
           onSearchHotels={onSearchHotels}
           searching={searching}
           showSearchResults={showSearchResults}
@@ -406,10 +421,7 @@ export function DashboardPage() {
     <div className="space-y-6">
       <SearchHero
         searchQuery={searchQuery}
-        setSearchQuery={(value) => {
-          setSearchQuery(value);
-          setSuppressNextAutoSearch(false);
-        }}
+        setSearchQuery={onSearchInputChange}
         onSearchHotels={onSearchHotels}
         searching={searching}
         showSearchResults={showSearchResults}
@@ -427,7 +439,7 @@ export function DashboardPage() {
         rightSlot={
           <>
             <select
-              className="rounded-lg border border-border bg-white px-3 py-2 text-sm"
+              className="rounded-lg border border-border bg-panel px-3 py-2 text-sm text-text"
               value={selectedHotelId}
               onChange={(event) => setSelectedHotelId(event.target.value)}
             >
@@ -857,4 +869,138 @@ function translatePriority(priority: string): string {
 
 function normalizeKey(value: string): string {
   return value.toLocaleLowerCase("ru-RU").replace(/\s+/g, " ").trim();
+}
+
+function findBestExistingHotel(hotels: Hotel[], candidate: HotelSearchResult): Hotel | undefined {
+  return hotels
+    .map((hotel) => ({
+      hotel,
+      score: scoreExistingHotel(hotel, candidate)
+    }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.hotel)[0];
+}
+
+function resolveSyncHotelSelection(selectedHotelId: string, hotels: Hotel[]): Hotel | undefined {
+  const selected = hotels.find((hotel) => hotel.id === selectedHotelId);
+  if (!selected) {
+    return undefined;
+  }
+  if ((selected.reviewCount ?? 0) > 0) {
+    return selected;
+  }
+
+  const candidate: HotelSearchResult = {
+    externalId: selected.externalId || selected.id,
+    name: selected.name,
+    city: selected.city,
+    country: selected.country,
+    address: selected.address,
+    coordinates: selected.coordinates,
+    source: "catalog_import"
+  };
+
+  const reviewedHotels = hotels.filter(
+    (hotel) => hotel.id !== selected.id && (hotel.reviewCount ?? 0) > 0
+  );
+  return findBestExistingHotel(reviewedHotels, candidate) || selected;
+}
+
+function scoreExistingHotel(hotel: Hotel, candidate: HotelSearchResult): number {
+  let score = 0;
+  const candidateExternal = normalizeKey(candidate.externalId || "");
+  const hotelExternal = normalizeKey(hotel.externalId || "");
+
+  if (candidateExternal) {
+    if (normalizeKey(hotel.id) === candidateExternal) {
+      score += 700;
+    }
+    if (hotelExternal && hotelExternal === candidateExternal) {
+      score += 640;
+    }
+  }
+
+  const hotelKeys = buildHotelMatchKeys(hotel.name, hotel.city);
+  const candidateKeys = buildHotelMatchKeys(candidate.name, candidate.city);
+  const sharedKeys = [...candidateKeys].filter((key) => hotelKeys.has(key));
+  score += sharedKeys.length * 140;
+
+  if (normalizeKey(hotel.city) === normalizeKey(candidate.city)) {
+    score += 50;
+  }
+
+  if ((hotel.reviewCount ?? 0) > 0) {
+    score += 20;
+  }
+
+  score += Math.min(hotel.reviewCount ?? 0, 300) * 0.05;
+
+  return score;
+}
+
+function buildHotelMatchKeys(name: string, city: string): Set<string> {
+  const baseName = normalizeKey(name);
+  const baseFull = normalizeKey(`${name} ${city}`);
+  const aliasName = replaceBrandAliases(baseName);
+  const aliasFull = replaceBrandAliases(baseFull);
+  const translitName = transliterateCyrillicToLatin(aliasName);
+  const translitFull = transliterateCyrillicToLatin(aliasFull);
+
+  return new Set(
+    [baseName, baseFull, aliasName, aliasFull, translitName, translitFull].filter(
+      (value) => value.length >= 2
+    )
+  );
+}
+
+function replaceBrandAliases(value: string): string {
+  return value
+    .replace(/\u043a\u043e\u0440\u0442\u044a?\u044f\u0440\u0434/giu, "courtyard")
+    .replace(/\u043c\u0430\u0440\u0440\u0438?\u043e\u0442\u0442/giu, "marriott")
+    .replace(/\u043c\u0430\u0440\u0438\u043d\u0441/giu, "marins")
+    .replace(/\u0445\u0438\u043b\u0442\u043e\u043d/giu, "hilton")
+    .replace(/\u0445\u0430\u044f\u0442\u0442/giu, "hyatt");
+}
+
+function transliterateCyrillicToLatin(value: string): string {
+  const map: Record<string, string> = {
+    а: "a",
+    б: "b",
+    в: "v",
+    г: "g",
+    д: "d",
+    е: "e",
+    ё: "e",
+    ж: "zh",
+    з: "z",
+    и: "i",
+    й: "y",
+    к: "k",
+    л: "l",
+    м: "m",
+    н: "n",
+    о: "o",
+    п: "p",
+    р: "r",
+    с: "s",
+    т: "t",
+    у: "u",
+    ф: "f",
+    х: "h",
+    ц: "ts",
+    ч: "ch",
+    ш: "sh",
+    щ: "sch",
+    ъ: "",
+    ы: "y",
+    ь: "",
+    э: "e",
+    ю: "yu",
+    я: "ya"
+  };
+
+  return [...value]
+    .map((char) => map[char.toLocaleLowerCase("ru-RU")] ?? char)
+    .join("");
 }

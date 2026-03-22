@@ -43,7 +43,7 @@ export function AnalysisProgress({
         {run.provider ? <Badge variant="default">Источник: {run.provider}</Badge> : null}
       </div>
 
-      <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-200">
+      <div className="mt-4 h-3 overflow-hidden rounded-full bg-panelMuted">
         <div
           className={cn(
             "h-full rounded-full transition-all duration-700",
@@ -66,13 +66,13 @@ export function AnalysisProgress({
               key={item.id}
               className={cn(
                 "flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm",
-                isPassed && "bg-green-50",
-                isCurrent && "bg-amber-50"
+                isPassed && "bg-panelMuted text-success",
+                isCurrent && "bg-panelMuted text-warning"
               )}
             >
               <span
                 className={cn(
-                  "inline-block h-2.5 w-2.5 rounded-full bg-slate-300",
+                  "inline-block h-2.5 w-2.5 rounded-full bg-textMuted",
                   isPassed && "bg-success",
                   isCurrent && "bg-warning anim-pulse-soft"
                 )}
@@ -84,7 +84,7 @@ export function AnalysisProgress({
       </div>
 
       {run.errorMessage ? (
-        <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-danger">
+        <p className="mt-3 rounded-lg border border-border bg-panelMuted px-3 py-2 text-sm text-danger">
           {run.errorMessage}
         </p>
       ) : null}

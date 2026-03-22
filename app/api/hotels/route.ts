@@ -5,8 +5,10 @@ import { createHotel } from "@/server/services/intelligence.service";
 
 export async function GET() {
   const repository = getRepository();
+  const hotels = repository.listHotels();
+  const reviewedHotels = hotels.filter((hotel) => (hotel.reviewCount ?? 0) > 0);
   return NextResponse.json({
-    items: repository.listHotels()
+    items: reviewedHotels.length ? reviewedHotels : hotels
   });
 }
 

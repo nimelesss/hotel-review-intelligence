@@ -67,6 +67,18 @@ body {
   overflow-x: hidden;
 }
 
+input,
+select,
+textarea {
+  background-color: var(--panel);
+  color: var(--text);
+}
+
+select option {
+  background-color: var(--panel);
+  color: var(--text);
+}
+
 h1,
 h2,
 h3,

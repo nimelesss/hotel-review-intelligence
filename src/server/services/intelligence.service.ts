@@ -28,13 +28,28 @@ import { fetchPlatformReviews } from "@/server/platform-fetch";
 export function resolveHotelId(candidate?: string): string {
   const repository = getRepository();
   const hotels = repository.listHotels();
-  if (candidate && repository.getHotelById(candidate)) {
-    return candidate;
+  const reviewedHotels = hotels.filter((hotel) => (hotel.reviewCount ?? 0) > 0);
+
+  if (candidate) {
+    const selected = repository.getHotelById(candidate);
+    if (selected) {
+      if ((selected.reviewCount ?? 0) > 0) {
+        return selected.id;
+      }
+      const replacement = findReviewedReplacementHotel(selected, reviewedHotels);
+      if (replacement) {
+        return replacement.id;
+      }
+      return selected.id;
+    }
   }
-  if (repository.getHotelById(DEFAULT_HOTEL_ID)) {
-    return DEFAULT_HOTEL_ID;
+
+  const defaultHotel = repository.getHotelById(DEFAULT_HOTEL_ID);
+  if (defaultHotel && (defaultHotel.reviewCount ?? 0) > 0) {
+    return defaultHotel.id;
   }
-  return hotels[0]?.id ?? "";
+
+  return reviewedHotels[0]?.id ?? hotels[0]?.id ?? "";
 }
 
 export function getDashboardPayload(hotelIdRaw?: string): DashboardPayload {
@@ -439,6 +454,122 @@ function buildDashboardDataHealth(sourceCoverage: SourceCoverageItem[]): Dashboa
     trackedSources,
     reviewCoverageSummary
   };
+}
+
+function findReviewedReplacementHotel(hotel: DashboardPayload["hotel"], reviewedHotels: DashboardPayload["hotel"][]) {
+  if (!reviewedHotels.length) {
+    return undefined;
+  }
+
+  if (hotel.externalId) {
+    const byId = reviewedHotels.find((candidate) => candidate.id === hotel.externalId);
+    if (byId) {
+      return byId;
+    }
+    const byExternal = reviewedHotels.find(
+      (candidate) => candidate.externalId && candidate.externalId === hotel.externalId
+    );
+    if (byExternal) {
+      return byExternal;
+    }
+  }
+
+  const hotelKeys = buildHotelIdentityKeys(hotel.name, hotel.city);
+  return reviewedHotels
+    .map((candidate) => ({
+      candidate,
+      score: scoreHotelIdentity(hotelKeys, candidate)
+    }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.candidate)[0];
+}
+
+function scoreHotelIdentity(identityKeys: Set<string>, candidate: DashboardPayload["hotel"]): number {
+  const candidateKeys = buildHotelIdentityKeys(candidate.name, candidate.city);
+  const shared = [...identityKeys].filter((key) => candidateKeys.has(key));
+  if (!shared.length) {
+    return 0;
+  }
+
+  let score = shared.length * 120;
+  score += Math.min(candidate.reviewCount ?? 0, 300) * 0.08;
+  return score;
+}
+
+function buildHotelIdentityKeys(name: string, city: string): Set<string> {
+  const baseName = normalizeIdentityValue(name);
+  const baseFull = normalizeIdentityValue(`${name} ${city}`);
+  const aliasName = applyBrandAliases(baseName);
+  const aliasFull = applyBrandAliases(baseFull);
+  const translitName = transliterateCyrillic(aliasName);
+  const translitFull = transliterateCyrillic(aliasFull);
+
+  return new Set(
+    [baseName, baseFull, aliasName, aliasFull, translitName, translitFull].filter(
+      (value) => value.length >= 2
+    )
+  );
+}
+
+function normalizeIdentityValue(value: string): string {
+  return value
+    .toLocaleLowerCase("ru-RU")
+    .replace(/\u0451/g, "\u0435")
+    .replace(/[^\p{L}\p{N}\s-]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function applyBrandAliases(value: string): string {
+  return value
+    .replace(/\u043a\u043e\u0440\u0442\u044a?\u044f\u0440\u0434/giu, "courtyard")
+    .replace(/\u043c\u0430\u0440\u0440\u0438?\u043e\u0442\u0442/giu, "marriott")
+    .replace(/\u043c\u0430\u0440\u0438\u043d\u0441/giu, "marins")
+    .replace(/\u0445\u0438\u043b\u0442\u043e\u043d/giu, "hilton")
+    .replace(/\u0445\u0430\u044f\u0442\u0442/giu, "hyatt");
+}
+
+function transliterateCyrillic(value: string): string {
+  const map: Record<string, string> = {
+    а: "a",
+    б: "b",
+    в: "v",
+    г: "g",
+    д: "d",
+    е: "e",
+    ё: "e",
+    ж: "zh",
+    з: "z",
+    и: "i",
+    й: "y",
+    к: "k",
+    л: "l",
+    м: "m",
+    н: "n",
+    о: "o",
+    п: "p",
+    р: "r",
+    с: "s",
+    т: "t",
+    у: "u",
+    ф: "f",
+    х: "h",
+    ц: "ts",
+    ч: "ch",
+    ш: "sh",
+    щ: "sch",
+    ъ: "",
+    ы: "y",
+    ь: "",
+    э: "e",
+    ю: "yu",
+    я: "ya"
+  };
+
+  return [...value]
+    .map((char) => map[char.toLocaleLowerCase("ru-RU")] ?? char)
+    .join("");
 }
 
 function toSentimentLabel(score: number): SentimentLabel {

@@ -10,6 +10,7 @@ import { getRepository } from "@/server/repositories";
 import { startPlatformIngestionRun } from "@/server/services/intelligence.service";
 import { canFetchWithoutDatasetUrl } from "@/server/platform-fetch/providers/apify-dataset";
 import { createId } from "@/shared/lib/id";
+import { normalizeSearchText } from "@/shared/lib/text";
 
 type SyncMode = "manual" | "weekly";
 
@@ -410,11 +411,11 @@ function scoreDonorCandidate(
 }
 
 function normalizeIdentity(value: string): string {
-  const normalized = value
-    .toLocaleLowerCase("ru-RU")
-    .replace(/\u0451/g, "\u0435")
-    .replace(/[^\p{L}\p{N}\s-]+/gu, " ")
-    .replace(/\b(отель|гостиница|hotel|hostel|by|marriott|inn|resort)\b/gu, " ")
+  const normalized = normalizeSearchText(value)
+    .replace(
+      /\b(\u043e\u0442\u0435\u043b\u044c|\u0433\u043e\u0441\u0442\u0438\u043d\u0438\u0446\u0430|hotel|hostel|by|marriott|inn|resort)\b/giu,
+      " "
+    )
     .replace(/\s+/g, " ")
     .trim();
 
@@ -459,7 +460,9 @@ function transliterateCyrillicToLatin(value: string): string {
     я: "ya"
   };
 
-  return [...value].map((char) => map[char] ?? char).join("");
+  return [...value]
+    .map((char) => map[char.toLocaleLowerCase("ru-RU")] ?? char)
+    .join("");
 }
 
 function runLocalReanalysisIfPossible(

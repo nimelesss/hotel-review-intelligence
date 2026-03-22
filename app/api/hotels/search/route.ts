@@ -21,16 +21,21 @@ export async function GET(request: Request) {
 
   const repository = getRepository();
   const hotels = repository.listHotels();
+  const hotelsById = new Map(hotels.map((hotel) => [hotel.id, hotel]));
+  const hotelsByExternalId = new Map(
+    hotels
+      .filter((hotel) => !!hotel.externalId)
+      .map((hotel) => [normalize(hotel.externalId || ""), hotel])
+  );
   const queryVariants = buildQueryVariants(query);
 
-  const withReviews = scoreRepositoryHotels(
-    hotels.filter((hotel) => (hotel.reviewCount ?? 0) > 0),
-    queryVariants
-  );
+  const reviewedHotels = hotels.filter((hotel) => (hotel.reviewCount ?? 0) > 0);
+  const reviewedByNameCity = indexHotelsByNameCity(reviewedHotels);
+  const withReviews = scoreRepositoryHotels(reviewedHotels, queryVariants);
 
   let entries = dedupeScoredEntries(withReviews);
 
-  if (!entries.length) {
+  if (!entries.length && !reviewedHotels.length) {
     const withoutReviewFilter = scoreRepositoryHotels(hotels, queryVariants);
     entries = dedupeScoredEntries(withoutReviewFilter);
   }
@@ -45,7 +50,26 @@ export async function GET(request: Request) {
       }))
     );
 
-    entries = dedupeScoredEntries([...entries, ...cacheEntries]);
+    const mappedCacheEntries = cacheEntries
+      .map((entry) => {
+        const localHotel = resolveReviewedHotelForCatalogItem(
+          entry.item,
+          hotelsById,
+          hotelsByExternalId,
+          reviewedByNameCity
+        );
+        if (!localHotel) {
+          return null;
+        }
+        const localItem = mapHotelToSearchItem(localHotel);
+        return {
+          item: localItem,
+          score: Math.max(entry.score, scoreCatalogItem(localItem, queryVariants))
+        } satisfies ScoredSearchEntry;
+      })
+      .filter((entry): entry is ScoredSearchEntry => !!entry);
+
+    entries = dedupeScoredEntries([...entries, ...mappedCacheEntries]);
   }
 
   const items = entries
@@ -58,30 +82,12 @@ export async function GET(request: Request) {
 }
 
 function scoreRepositoryHotels(
-  hotels: Array<{
-    id: string;
-    name: string;
-    city: string;
-    country: string;
-    address: string;
-    coordinates?: {
-      lat: number;
-      lon: number;
-    };
-  }>,
+  hotels: LocalHotel[],
   queryVariants: string[]
 ): ScoredSearchEntry[] {
   return hotels
     .map((hotel) => {
-      const item: HotelSearchResult = {
-        externalId: hotel.id,
-        name: hotel.name,
-        city: hotel.city,
-        country: hotel.country,
-        address: hotel.address,
-        coordinates: hotel.coordinates,
-        source: "catalog_import"
-      };
+      const item = mapHotelToSearchItem(hotel);
 
       return {
         item,
@@ -89,6 +95,58 @@ function scoreRepositoryHotels(
       };
     })
     .filter((entry) => entry.score > 0);
+}
+
+function indexHotelsByNameCity(hotels: LocalHotel[]): Map<string, LocalHotel[]> {
+  const index = new Map<string, LocalHotel[]>();
+  hotels.forEach((hotel) => {
+    const key = makeHotelNameCityKey(hotel.name, hotel.city);
+    const bucket = index.get(key) || [];
+    bucket.push(hotel);
+    index.set(key, bucket);
+  });
+  return index;
+}
+
+function resolveReviewedHotelForCatalogItem(
+  item: HotelSearchResult,
+  hotelsById: Map<string, LocalHotel>,
+  hotelsByExternalId: Map<string, LocalHotel>,
+  reviewedByNameCity: Map<string, LocalHotel[]>
+): LocalHotel | null {
+  const byId = hotelsById.get(item.externalId);
+  if ((byId?.reviewCount ?? 0) > 0) {
+    return byId ?? null;
+  }
+
+  const byExternal = hotelsByExternalId.get(normalize(item.externalId || ""));
+  if ((byExternal?.reviewCount ?? 0) > 0) {
+    return byExternal ?? null;
+  }
+
+  const matches = reviewedByNameCity.get(makeHotelNameCityKey(item.name, item.city)) || [];
+  const best = matches
+    .slice()
+    .sort(
+    (a, b) => (b.reviewCount ?? 0) - (a.reviewCount ?? 0)
+  )[0];
+  return best || null;
+}
+
+function makeHotelNameCityKey(name: string, city: string): string {
+  return `${normalize(name)}|${normalize(city)}`;
+}
+
+function mapHotelToSearchItem(hotel: LocalHotel): HotelSearchResult {
+  return {
+    externalId: hotel.id,
+    name: hotel.name,
+    city: hotel.city,
+    country: hotel.country,
+    address: hotel.address,
+    coordinates: hotel.coordinates,
+    source: "catalog_import"
+  };
 }
 
 function scoreCatalogItem(
@@ -163,11 +221,11 @@ function buildQueryVariants(query: string): string[] {
 
 function replaceBrandAliases(query: string): string {
   return query
-    .replace(/корт[ья]рд/gi, "courtyard")
-    .replace(/марри?отт/gi, "marriott")
-    .replace(/хилтон/gi, "hilton")
-    .replace(/хаятт/gi, "hyatt")
-    .replace(/маринс/gi, "marins");
+    .replace(/\u043a\u043e\u0440\u0442\u044a?\u044f\u0440\u0434/giu, "courtyard")
+    .replace(/\u043c\u0430\u0440\u0440\u0438?\u043e\u0442\u0442/giu, "marriott")
+    .replace(/\u0445\u0438\u043b\u0442\u043e\u043d/giu, "hilton")
+    .replace(/\u0445\u0430\u044f\u0442\u0442/giu, "hyatt")
+    .replace(/\u043c\u0430\u0440\u0438\u043d\u0441/giu, "marins");
 }
 
 function transliterateCyrillicToLatin(value: string): string {
@@ -236,6 +294,20 @@ function makeResultKey(item: HotelSearchResult): string {
 interface ScoredSearchEntry {
   item: HotelSearchResult;
   score: number;
+}
+
+interface LocalHotel {
+  id: string;
+  externalId?: string;
+  name: string;
+  city: string;
+  country: string;
+  address: string;
+  coordinates?: {
+    lat: number;
+    lon: number;
+  };
+  reviewCount?: number;
 }
 
 function normalize(value: string): string {

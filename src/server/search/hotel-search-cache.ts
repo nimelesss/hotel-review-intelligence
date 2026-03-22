@@ -1,4 +1,4 @@
-﻿import fs from "node:fs";
+import fs from "node:fs";
 import path from "node:path";
 import { HotelSearchResult } from "@/entities/types";
 import { seedHotelSearchCatalog } from "@/data/seeds/hotel-search-catalog";
@@ -13,7 +13,7 @@ interface CacheFilePayload {
 
 const DEFAULT_CACHE_LIMIT = 50_000;
 const DEFAULT_MEMORY_TTL_MS = 60_000;
-const DEFAULT_INCLUDE_SEED_CATALOG = true;
+const DEFAULT_INCLUDE_SEED_CATALOG = false;
 const REMOTE_HYDRATE_RETRY_MS = 5 * 60 * 1000;
 const ADDRESS_ADMIN_WORDS = [
   "район",
