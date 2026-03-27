@@ -15,39 +15,92 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Deploy over SSH
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add server to known_hosts
+        run: |
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
-          password: ${{ secrets.VPS_PASSWORD }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
           script_stop: true
           command_timeout: 18m
           script: |
-            set -eu
+            set -euo pipefail
+            
+            echo "=== Starting deployment ==="
             cd /srv/hotel-review-intelligence
+            
+            # Pull latest changes
+            echo "Pulling latest changes..."
             git fetch origin main
-            git checkout -B main origin/main
-
-            rm -rf .next
-            timeout 10m npm ci --no-audit --no-fund
-            timeout 4m node scripts/restore-runtime-db-from-seed.mjs
-            timeout 10m npm run build
+            git reset --hard origin/main
+            
+            # Clean build artifacts
+            echo "Cleaning build artifacts..."
+            rm -rf .next node_modules
+            
+            # Install dependencies
+            echo "Installing dependencies..."
+            npm ci --no-audit --no-fund
+            
+            # Restore database from seed
+            echo "Restoring database..."
+            node scripts/restore-runtime-db-from-seed.mjs
+            
+            # Build application
+            echo "Building application..."
+            npm run build
+            
+            # Restart service
+            echo "Restarting service..."
+            systemctl daemon-reload
             systemctl restart hotel-review-intelligence
-            for i in $(seq 1 20); do
+            
+            # Wait for service to be healthy
+            echo "Waiting for service health..."
+            for i in $(seq 1 30); do
               if systemctl is-active --quiet hotel-review-intelligence; then
-                echo "Service is active"
+                echo "Service is active after ${i}s"
                 break
               fi
               sleep 1
             done
-            systemctl is-active --quiet hotel-review-intelligence
-            for i in $(seq 1 20); do
-              if curl -fsS http://127.0.0.1:3100/api/hotels >/dev/null; then
-                echo "Health-check passed"
+            
+            # Verify service is running
+            if ! systemctl is-active --quiet hotel-review-intelligence; then
+              echo "ERROR: Service failed to start"
+              systemctl status hotel-review-intelligence --no-pager
+              exit 1
+            fi
+            
+            # Health check
+            echo "Running health checks..."
+            for i in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:3100/api/hotels >/dev/null 2>&1; then
+                echo "API health-check passed after ${i}s"
                 break
               fi
               sleep 2
             done
-            curl -fsS http://127.0.0.1:3100/api/hotels >/dev/null
-            echo "Deploy completed successfully"
+            
+            # Final verification
+            if ! curl -fsS http://127.0.0.1:3100/api/hotels >/dev/null 2>&1; then
+              echo "ERROR: Health check failed"
+              exit 1
+            fi
+            
+            echo "=== Deployment completed successfully ==="
