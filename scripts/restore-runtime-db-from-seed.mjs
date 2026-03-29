@@ -43,6 +43,21 @@ function fileSize(filePath) {
   }
 }
 
+function removeIfExists(filePath) {
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.rmSync(filePath, { force: true });
+    }
+  } catch {
+    // ignore fs race conditions
+  }
+}
+
+function purgeSqliteSidecars(dbPath) {
+  removeIfExists(`${dbPath}-wal`);
+  removeIfExists(`${dbPath}-shm`);
+}
+
 function shouldRestore(target) {
   if (!fs.existsSync(target.runtimePath)) {
     return true;
@@ -200,9 +215,49 @@ function restoreFromSeed(target) {
     throw new Error(`Seed file not found: ${target.seedPath}`);
   }
 
+  purgeSqliteSidecars(target.runtimePath);
+  removeIfExists(target.runtimePath);
+
   const gz = fs.readFileSync(target.seedPath);
   const raw = zlib.gunzipSync(gz);
-  fs.writeFileSync(target.runtimePath, raw);
+  const tmpPath = `${target.runtimePath}.tmp-${Date.now()}`;
+  fs.writeFileSync(tmpPath, raw);
+  fs.renameSync(tmpPath, target.runtimePath);
+  purgeSqliteSidecars(target.runtimePath);
+}
+
+function verifyRuntimeTarget(target) {
+  const db = new Database(target.runtimePath, { readonly: true });
+  try {
+    const integrity = db.prepare("PRAGMA integrity_check").all();
+    const failed = integrity.some(
+      (row) => String(row?.integrity_check || "").toLowerCase() !== "ok"
+    );
+    if (failed) {
+      throw new Error(`Integrity check failed for ${target.name}`);
+    }
+
+    if (target.name === "review_intelligence") {
+      const reviews = Number(db.prepare("SELECT COUNT(*) AS count FROM reviews").get()?.count || 0);
+      if (reviews < QUALITY_GATES.minReviews) {
+        throw new Error(
+          `Quality gate failed for ${target.name}: reviews=${reviews}, expected>=${QUALITY_GATES.minReviews}`
+        );
+      }
+      return;
+    }
+
+    if (target.name === "hotel_catalog") {
+      const hotels = Number(db.prepare("SELECT COUNT(*) AS count FROM hotels").get()?.count || 0);
+      if (hotels < QUALITY_GATES.minHotels) {
+        throw new Error(
+          `Quality gate failed for ${target.name}: hotels=${hotels}, expected>=${QUALITY_GATES.minHotels}`
+        );
+      }
+    }
+  } finally {
+    db.close();
+  }
 }
 
 function main() {
@@ -242,6 +297,10 @@ function main() {
       before: 0
     });
   }
+
+  targets.forEach((target) => {
+    verifyRuntimeTarget(target);
+  });
 
   const reconcile = reconcileHotelCounters();
   summary.push({
