@@ -27,7 +27,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           port: ${{ secrets.VPS_PORT || 22 }}
-          script_stop: true
+          script_stop: false
           command_timeout: 18m
           script: |
             set -euo pipefail
