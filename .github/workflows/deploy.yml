@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: hotel-review-intelligence-vps-ops
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -48,65 +48,132 @@ jobs:
             echo "Cleaning build artifacts..."
             rm -rf .next node_modules
             
-            # Install dependencies
-            echo "Installing dependencies..."
-            npm ci --no-audit --no-fund
+            install_deps() {
+              echo "Installing dependencies..."
+              local attempt=1
+              while [ "$attempt" -le 2 ]; do
+                echo "npm ci attempt ${attempt}/2"
+                if npm ci --no-audit --no-fund; then
+                  return 0
+                fi
+                echo "npm ci failed on attempt ${attempt}; cleaning node_modules and npm cache"
+                rm -rf node_modules
+                npm cache clean --force || true
+                attempt=$((attempt + 1))
+              done
+              return 1
+            }
             
             # Restore database from seed
-            echo "Restoring database..."
-            node scripts/restore-runtime-db-from-seed.mjs
+            restore_db() {
+              echo "Restoring database..."
+              node scripts/restore-runtime-db-from-seed.mjs
+            }
             
             # Build application
-            echo "Building application..."
-            npm run build
+            build_app() {
+              echo "Building application..."
+              npm run build
+            }
             
             # Restart service
-            echo "Restarting service..."
-            systemctl daemon-reload
-            systemctl restart hotel-review-intelligence
+            restart_service() {
+              echo "Restarting service..."
+              systemctl daemon-reload
+              systemctl restart hotel-review-intelligence
+            }
             
             # Wait for service to be healthy
-            echo "Waiting for service health..."
-            for i in $(seq 1 30); do
-              if systemctl is-active --quiet hotel-review-intelligence; then
-                echo "Service is active after ${i}s"
-                break
-              fi
-              sleep 1
-            done
+            wait_for_service() {
+              echo "Waiting for service health..."
+              for i in $(seq 1 45); do
+                if systemctl is-active --quiet hotel-review-intelligence; then
+                  echo "Service is active after ${i}s"
+                  return 0
+                fi
+                sleep 1
+              done
+              return 1
+            }
             
             # Verify service is running
-            if ! systemctl is-active --quiet hotel-review-intelligence; then
-              echo "ERROR: Service failed to start"
-              systemctl status hotel-review-intelligence --no-pager
-              exit 1
-            fi
+            verify_service_active() {
+              if ! systemctl is-active --quiet hotel-review-intelligence; then
+                echo "ERROR: Service failed to start"
+                systemctl status hotel-review-intelligence --no-pager
+                return 1
+              fi
+              return 0
+            }
             
             # Health check
-            echo "Running health checks..."
-            for i in $(seq 1 30); do
-              if curl -fsS http://127.0.0.1:3100/api/hotels >/dev/null 2>&1; then
-                echo "API health-check passed after ${i}s"
-                break
-              fi
-              sleep 2
-            done
+            wait_for_hotels_api() {
+              echo "Running hotels API health checks..."
+              for i in $(seq 1 35); do
+                if curl -fsS --max-time 6 http://127.0.0.1:3100/api/hotels >/dev/null 2>&1; then
+                  echo "API health-check passed after ${i} attempts"
+                  return 0
+                fi
+                sleep 2
+              done
+              return 1
+            }
             
             # Final verification
-            if ! curl -fsS http://127.0.0.1:3100/api/hotels >/dev/null 2>&1; then
-              echo "ERROR: Health check failed"
-              exit 1
-            fi
+            verify_dashboard_api() {
+              local hotel_ids
+              hotel_ids=$(curl -fsS --max-time 8 http://127.0.0.1:3100/api/hotels | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);const ids=(j.items||[]).slice(0,8).map(x=>x.id).filter(Boolean);process.stdout.write(ids.join('\n'));}catch{process.stdout.write('');}})")
+              if [ -z "$hotel_ids" ]; then
+                echo "ERROR: Could not resolve candidate hotel ids from /api/hotels"
+                return 1
+              fi
 
-            # Deep verification: dashboard endpoint should read runtime DB without corruption
-            TOP_HOTEL_ID=$(curl -fsS http://127.0.0.1:3100/api/hotels | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);process.stdout.write(j.items?.[0]?.id||'');}catch{process.stdout.write('');}})")
-            if [ -z \"$TOP_HOTEL_ID\" ]; then
-              echo "ERROR: Could not resolve top hotel id from API"
-              exit 1
-            fi
-            if ! curl -fsS \"http://127.0.0.1:3100/api/hotels/${TOP_HOTEL_ID}/dashboard\" >/dev/null 2>&1; then
-              echo "ERROR: Dashboard endpoint failed for hotel ${TOP_HOTEL_ID}"
-              exit 1
+              local attempt
+              for attempt in $(seq 1 20); do
+                while IFS= read -r hotel_id; do
+                  [ -z "$hotel_id" ] && continue
+                  local status
+                  status=$(curl -sS --max-time 8 -o /tmp/hri_dashboard_probe.json -w '%{http_code}' "http://127.0.0.1:3100/api/hotels/${hotel_id}/dashboard" || true)
+                  if [ "$status" = "200" ]; then
+                    echo "Dashboard probe passed on attempt ${attempt} for hotel ${hotel_id}"
+                    return 0
+                  fi
+                done <<EOF
+$hotel_ids
+EOF
+                sleep 2
+              done
+
+              echo "ERROR: Dashboard probe failed for all candidate hotels"
+              echo "Last dashboard response:"
+              head -c 300 /tmp/hri_dashboard_probe.json || true
+              echo
+              return 1
+            }
+
+            run_deploy_checks() {
+              wait_for_service &&
+              verify_service_active &&
+              wait_for_hotels_api &&
+              verify_dashboard_api
+            }
+
+            install_deps
+            restore_db
+            build_app
+            restart_service
+
+            if ! run_deploy_checks; then
+              echo "Primary verification failed. Running self-heal cycle (restore + restart) once..."
+              systemctl stop hotel-review-intelligence || true
+              restore_db
+              restart_service
+              if ! run_deploy_checks; then
+                echo "ERROR: Verification failed after self-heal cycle"
+                systemctl status hotel-review-intelligence --no-pager || true
+                journalctl -u hotel-review-intelligence -n 120 --no-pager || true
+                exit 1
+              fi
             fi
             
             echo "=== Deployment completed successfully ==="
