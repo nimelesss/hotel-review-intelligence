@@ -28,23 +28,31 @@ export class SqliteIntelligenceRepository implements IntelligenceRepository {
       .prepare(
         `
           SELECT
-            id,
-            external_id,
-            name,
-            brand,
-            city,
-            country,
-            category,
-            address,
-            coordinates_lat,
-            coordinates_lon,
-            description,
-            review_count,
-            latest_review_date,
-            created_at,
-            updated_at
-          FROM hotel_catalog.hotels
-          ORDER BY review_count DESC, updated_at DESC
+            h.id,
+            h.external_id,
+            h.name,
+            h.brand,
+            h.city,
+            h.country,
+            h.category,
+            h.address,
+            h.coordinates_lat,
+            h.coordinates_lon,
+            h.description,
+            COALESCE(stats.review_count, h.review_count, 0) AS review_count,
+            COALESCE(stats.latest_review_date, h.latest_review_date) AS latest_review_date,
+            h.created_at,
+            h.updated_at
+          FROM hotel_catalog.hotels h
+          LEFT JOIN (
+            SELECT
+              hotel_id,
+              COUNT(*) AS review_count,
+              MAX(review_date) AS latest_review_date
+            FROM reviews
+            GROUP BY hotel_id
+          ) stats ON stats.hotel_id = h.id
+          ORDER BY COALESCE(stats.review_count, h.review_count, 0) DESC, h.updated_at DESC
         `
       )
       .all() as DbHotelRow[];
@@ -156,23 +164,31 @@ export class SqliteIntelligenceRepository implements IntelligenceRepository {
       .prepare(
         `
           SELECT
-            id,
-            external_id,
-            name,
-            brand,
-            city,
-            country,
-            category,
-            address,
-            coordinates_lat,
-            coordinates_lon,
-            description,
-            review_count,
-            latest_review_date,
-            created_at,
-            updated_at
-          FROM hotel_catalog.hotels
-          WHERE id = ?
+            h.id,
+            h.external_id,
+            h.name,
+            h.brand,
+            h.city,
+            h.country,
+            h.category,
+            h.address,
+            h.coordinates_lat,
+            h.coordinates_lon,
+            h.description,
+            COALESCE(stats.review_count, h.review_count, 0) AS review_count,
+            COALESCE(stats.latest_review_date, h.latest_review_date) AS latest_review_date,
+            h.created_at,
+            h.updated_at
+          FROM hotel_catalog.hotels h
+          LEFT JOIN (
+            SELECT
+              hotel_id,
+              COUNT(*) AS review_count,
+              MAX(review_date) AS latest_review_date
+            FROM reviews
+            GROUP BY hotel_id
+          ) stats ON stats.hotel_id = h.id
+          WHERE h.id = ?
           LIMIT 1
         `
       )

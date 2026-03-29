@@ -131,6 +131,70 @@ function validateCrossDbConsistency() {
   }
 }
 
+function reconcileHotelCounters() {
+  const catalogPath = path.join(RUNTIME_DIR, "hotel_catalog.sqlite");
+  const intelPath = path.join(RUNTIME_DIR, "review_intelligence.sqlite");
+  if (!fs.existsSync(catalogPath) || !fs.existsSync(intelPath)) {
+    return {
+      updated: 0,
+      hotelsWithReviews: 0
+    };
+  }
+
+  const db = new Database(intelPath);
+  const escapedCatalogPath = catalogPath.replace(/'/g, "''");
+  db.exec(`ATTACH DATABASE '${escapedCatalogPath}' AS hotel_catalog`);
+
+  db.exec(`
+    DROP TABLE IF EXISTS temp_runtime_hotel_stats;
+    CREATE TEMP TABLE temp_runtime_hotel_stats AS
+      SELECT
+        hotel_id,
+        COUNT(*) AS review_count,
+        MAX(review_date) AS latest_review_date
+      FROM reviews
+      GROUP BY hotel_id;
+    CREATE INDEX IF NOT EXISTS idx_temp_runtime_hotel_stats_id
+      ON temp_runtime_hotel_stats(hotel_id);
+  `);
+
+  const updated = db
+    .prepare(
+      `
+        UPDATE hotel_catalog.hotels
+        SET
+          review_count = COALESCE((
+            SELECT s.review_count
+            FROM temp_runtime_hotel_stats s
+            WHERE s.hotel_id = hotel_catalog.hotels.id
+          ), 0),
+          latest_review_date = (
+            SELECT s.latest_review_date
+            FROM temp_runtime_hotel_stats s
+            WHERE s.hotel_id = hotel_catalog.hotels.id
+          ),
+          updated_at = ?
+      `
+    )
+    .run(new Date().toISOString()).changes;
+
+  const hotelsWithReviews = Number(
+    db
+      .prepare(
+        `SELECT COUNT(*) AS count FROM hotel_catalog.hotels WHERE COALESCE(review_count, 0) > 0`
+      )
+      .get()?.count || 0
+  );
+
+  db.exec(`DROP TABLE IF EXISTS temp_runtime_hotel_stats`);
+  db.close();
+
+  return {
+    updated: Number(updated || 0),
+    hotelsWithReviews
+  };
+}
+
 function restoreFromSeed(target) {
   if (!fs.existsSync(target.seedPath)) {
     throw new Error(`Seed file not found: ${target.seedPath}`);
@@ -178,6 +242,14 @@ function main() {
       before: 0
     });
   }
+
+  const reconcile = reconcileHotelCounters();
+  summary.push({
+    target: "hotel_catalog_counters",
+    action: "reconciled",
+    updatedRows: reconcile.updated,
+    hotelsWithReviews: reconcile.hotelsWithReviews
+  });
 
   const out = {
     restoredAt: new Date().toISOString(),
