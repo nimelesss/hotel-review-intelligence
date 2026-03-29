@@ -130,7 +130,7 @@ jobs:
 
               local attempt
               for attempt in $(seq 1 20); do
-                while IFS= read -r hotel_id; do
+                for hotel_id in $hotel_ids; do
                   [ -z "$hotel_id" ] && continue
                   local status
                   status=$(curl -sS --max-time 8 -o /tmp/hri_dashboard_probe.json -w '%{http_code}' "http://127.0.0.1:3100/api/hotels/${hotel_id}/dashboard" || true)
@@ -138,9 +138,7 @@ jobs:
                     echo "Dashboard probe passed on attempt ${attempt} for hotel ${hotel_id}"
                     return 0
                   fi
-                done <<EOF
-$hotel_ids
-EOF
+                done
                 sleep 2
               done
 
