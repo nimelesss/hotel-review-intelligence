@@ -221,7 +221,7 @@ function buildQueryVariants(query: string): string[] {
 
 function replaceBrandAliases(query: string): string {
   return query
-    .replace(/\u043a\u043e\u0440\u0442\u044a?\u044f\u0440\u0434/giu, "courtyard")
+    .replace(/\u043a\u043e\u0440\u0442[\u044a\u044c]?\u044f\u0440\u0434/giu, "courtyard")
     .replace(/\u043c\u0430\u0440\u0440\u0438?\u043e\u0442\u0442/giu, "marriott")
     .replace(/\u0445\u0438\u043b\u0442\u043e\u043d/giu, "hilton")
     .replace(/\u0445\u0430\u044f\u0442\u0442/giu, "hyatt")
