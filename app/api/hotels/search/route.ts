@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { HotelSearchResult } from "@/entities/types";
+import { getRepository } from "@/server/repositories";
 import {
   hydrateHotelCatalogFromRemoteSource,
   searchHotelCatalog
 } from "@/server/search/hotel-search-cache";
 import { normalizeSearchText, normalizeWhitespace } from "@/shared/lib/text";
+
+const REPOSITORY_INDEX_TTL_MS = 30_000;
+
+let repositoryIndexCache: IndexedRepositoryHotel[] | null = null;
+let repositoryIndexBuiltAt = 0;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -19,7 +25,7 @@ export async function GET(request: Request) {
   }
 
   const queryVariants = buildQueryVariants(query);
-  const lookupLimit = Math.max(limit * 3, 30);
+  const lookupLimit = Math.max(limit * 4, 40);
 
   const cacheEntries = queryVariants.flatMap((variant) =>
     searchHotelCatalog(variant, lookupLimit).map((item) => ({
@@ -28,10 +34,15 @@ export async function GET(request: Request) {
     }))
   );
 
-  const entries = dedupeScoredEntries(cacheEntries);
+  const includeRepository = normalize(query).length >= 3;
+  const repositoryEntries = includeRepository
+    ? searchRepositoryHotels(queryVariants, lookupLimit)
+    : [];
+
+  const entries = dedupeScoredEntries([...cacheEntries, ...repositoryEntries]);
 
   if (entries.length < limit) {
-    // Do not block search by remote catalog hydration.
+    // Keep hydration non-blocking for request latency.
     void hydrateHotelCatalogFromRemoteSource();
   }
 
@@ -44,6 +55,73 @@ export async function GET(request: Request) {
   return NextResponse.json({ items });
 }
 
+function searchRepositoryHotels(queryVariants: string[], limit: number): ScoredSearchEntry[] {
+  const index = getRepositoryIndex();
+  const maxBuffer = Math.max(limit * 6, 180);
+  const pruneTo = Math.max(limit * 3, 90);
+  const buffer: ScoredSearchEntry[] = [];
+
+  for (const indexed of index) {
+    const score = scoreIndexedHotel(indexed, queryVariants);
+    if (score <= 0) {
+      continue;
+    }
+
+    buffer.push({ item: indexed.item, score });
+
+    if (buffer.length > maxBuffer) {
+      buffer.sort((a, b) => b.score - a.score);
+      buffer.length = pruneTo;
+    }
+  }
+
+  return buffer.sort((a, b) => b.score - a.score).slice(0, limit);
+}
+
+function getRepositoryIndex(): IndexedRepositoryHotel[] {
+  if (
+    repositoryIndexCache &&
+    Date.now() - repositoryIndexBuiltAt < REPOSITORY_INDEX_TTL_MS
+  ) {
+    return repositoryIndexCache;
+  }
+
+  const repository = getRepository();
+  const hotels = repository.listHotels();
+
+  repositoryIndexCache = hotels.map((hotel) => {
+    const item: HotelSearchResult = {
+      externalId: hotel.externalId || hotel.id,
+      name: hotel.name,
+      city: hotel.city,
+      country: hotel.country || "\u0420\u043e\u0441\u0441\u0438\u044f",
+      address: hotel.address || `${hotel.city}, \u0420\u043e\u0441\u0441\u0438\u044f`,
+      coordinates: hotel.coordinates,
+      source: "catalog_import"
+    };
+
+    return {
+      item,
+      nameVariants: buildTextVariants(item.name),
+      cityVariants: buildTextVariants(item.city),
+      addressVariants: buildTextVariants(item.address)
+    } satisfies IndexedRepositoryHotel;
+  });
+
+  repositoryIndexBuiltAt = Date.now();
+  return repositoryIndexCache;
+}
+
+function scoreIndexedHotel(indexed: IndexedRepositoryHotel, queryVariants: string[]): number {
+  let maxScore = 0;
+
+  queryVariants.forEach((variant) => {
+    maxScore = Math.max(maxScore, scoreBySingleQueryWithVariants(indexed, variant));
+  });
+
+  return maxScore;
+}
+
 function scoreCatalogItem(
   item: {
     name: string;
@@ -53,9 +131,11 @@ function scoreCatalogItem(
   queryVariants: string[]
 ): number {
   let maxScore = 0;
+
   queryVariants.forEach((variant) => {
     maxScore = Math.max(maxScore, scoreBySingleQuery(item, variant));
   });
+
   return maxScore;
 }
 
@@ -67,10 +147,22 @@ function scoreBySingleQuery(
   },
   query: string
 ): number {
+  return scoreBySingleQueryWithVariants(
+    {
+      nameVariants: buildTextVariants(hotel.name),
+      cityVariants: buildTextVariants(hotel.city),
+      addressVariants: buildTextVariants(hotel.address)
+    },
+    query
+  );
+}
+
+function scoreBySingleQueryWithVariants(
+  indexed: Pick<IndexedRepositoryHotel, "nameVariants" | "cityVariants" | "addressVariants">,
+  query: string
+): number {
   const q = normalize(query);
-  const nameVariants = buildTextVariants(hotel.name);
-  const cityVariants = buildTextVariants(hotel.city);
-  const addressVariants = buildTextVariants(hotel.address);
+  const { nameVariants, cityVariants, addressVariants } = indexed;
   const tokens = q.split(" ").filter(Boolean);
 
   if (!q) {
@@ -153,11 +245,11 @@ function replaceBrandAliases(query: string): string {
 
 function replaceLatinBrandAliases(query: string): string {
   return query
-    .replace(/\bcourtyard\b/giu, "кортъярд")
-    .replace(/\bmarriott\b/giu, "марриотт")
-    .replace(/\bhilton\b/giu, "хилтон")
-    .replace(/\bhyatt\b/giu, "хаятт")
-    .replace(/\bmarins\b/giu, "маринс");
+    .replace(/\bcourtyard\b/giu, "\u043a\u043e\u0440\u0442\u044a\u044f\u0440\u0434")
+    .replace(/\bmarriott\b/giu, "\u043c\u0430\u0440\u0440\u0438\u043e\u0442\u0442")
+    .replace(/\bhilton\b/giu, "\u0445\u0438\u043b\u0442\u043e\u043d")
+    .replace(/\bhyatt\b/giu, "\u0445\u0430\u044f\u0442\u0442")
+    .replace(/\bmarins\b/giu, "\u043c\u0430\u0440\u0438\u043d\u0441");
 }
 
 function dedupeScoredEntries(entries: ScoredSearchEntry[]): ScoredSearchEntry[] {
@@ -186,6 +278,13 @@ function makeResultKey(item: HotelSearchResult): string {
 interface ScoredSearchEntry {
   item: HotelSearchResult;
   score: number;
+}
+
+interface IndexedRepositoryHotel {
+  item: HotelSearchResult;
+  nameVariants: string[];
+  cityVariants: string[];
+  addressVariants: string[];
 }
 
 function normalize(value: string): string {
