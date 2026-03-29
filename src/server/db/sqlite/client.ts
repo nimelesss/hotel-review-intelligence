@@ -99,6 +99,32 @@ function getSchemaSql() {
     CREATE INDEX IF NOT EXISTS hotel_catalog.idx_hotels_review_count
       ON hotels (review_count DESC);
 
+    CREATE TABLE IF NOT EXISTS hotel_catalog.external_profiles (
+      id TEXT PRIMARY KEY,
+      hotel_id TEXT NOT NULL,
+      source TEXT NOT NULL,
+      external_id TEXT,
+      external_uri TEXT,
+      external_url TEXT,
+      external_name TEXT,
+      external_address TEXT,
+      latitude REAL,
+      longitude REAL,
+      rating REAL,
+      reviews_count INTEGER,
+      match_confidence REAL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      last_verified_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS hotel_catalog.uq_external_profiles_hotel_source
+      ON external_profiles (hotel_id, source);
+
+    CREATE INDEX IF NOT EXISTS hotel_catalog.idx_external_profiles_source
+      ON external_profiles (source, updated_at DESC);
+
     CREATE TABLE IF NOT EXISTS reviews (
       id TEXT PRIMARY KEY,
       hotel_id TEXT NOT NULL,
@@ -186,5 +212,42 @@ function getSchemaSql() {
 
     CREATE INDEX IF NOT EXISTS idx_analysis_runs_hotel_started
       ON analysis_runs (hotel_id, started_at DESC);
+
+    CREATE TABLE IF NOT EXISTS review_fetch_jobs (
+      id TEXT PRIMARY KEY,
+      hotel_id TEXT NOT NULL,
+      trigger_type TEXT NOT NULL,
+      from_date TEXT,
+      to_date TEXT,
+      status TEXT NOT NULL,
+      progress_pct REAL NOT NULL DEFAULT 0,
+      current_stage TEXT NOT NULL,
+      total_collected INTEGER NOT NULL DEFAULT 0,
+      warning_count INTEGER NOT NULL DEFAULT 0,
+      error_message TEXT,
+      started_at TEXT,
+      completed_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_review_fetch_jobs_hotel_created
+      ON review_fetch_jobs (hotel_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS review_fetch_job_sources (
+      id TEXT PRIMARY KEY,
+      job_id TEXT NOT NULL,
+      source TEXT NOT NULL,
+      status TEXT NOT NULL,
+      collected_count INTEGER NOT NULL DEFAULT 0,
+      notes TEXT,
+      error_message TEXT,
+      started_at TEXT,
+      completed_at TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_review_fetch_job_sources_job_source
+      ON review_fetch_job_sources (job_id, source);
   `;
 }

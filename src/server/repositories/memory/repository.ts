@@ -5,9 +5,12 @@ import {
   CreateHotelRequest,
   Hotel,
   HotelAggregate,
+  HotelExternalProfile,
   Recommendation,
   Review,
   ReviewAnalysis,
+  ReviewFetchJob,
+  ReviewFetchJobSource,
   ReviewsQuery,
   ReviewsQueryResult
 } from "@/entities/types";
@@ -27,6 +30,9 @@ interface MemoryState {
   aggregates: HotelAggregate[];
   recommendations: Recommendation[];
   runs: AnalysisRun[];
+  externalProfiles: HotelExternalProfile[];
+  reviewFetchJobs: ReviewFetchJob[];
+  reviewFetchJobSources: ReviewFetchJobSource[];
 }
 
 const LEGACY_DEMO_HOTEL_IDS = new Set([
@@ -55,7 +61,10 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
       analyses: seed?.analyses ?? [],
       aggregates: seed?.aggregates ?? [],
       recommendations: seed?.recommendations ?? [],
-      runs: seed?.runs ?? []
+      runs: seed?.runs ?? [],
+      externalProfiles: [],
+      reviewFetchJobs: [],
+      reviewFetchJobSources: []
     };
 
     const loaded = this.loadFromDisk();
@@ -217,6 +226,112 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
     return this.state.runs.find((run) => run.id === runId);
   }
 
+  listExternalProfilesByHotel(hotelId: string): HotelExternalProfile[] {
+    this.syncFromDisk();
+    return this.state.externalProfiles
+      .filter((profile) => profile.hotelId === hotelId)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  upsertExternalProfile(profile: HotelExternalProfile): void {
+    this.syncFromDisk();
+    const existingIndex = this.state.externalProfiles.findIndex(
+      (item) => item.hotelId === profile.hotelId && item.source === profile.source
+    );
+    if (existingIndex === -1) {
+      this.state.externalProfiles = [profile, ...this.state.externalProfiles];
+    } else {
+      this.state.externalProfiles[existingIndex] = {
+        ...this.state.externalProfiles[existingIndex],
+        ...profile
+      };
+    }
+    this.flushToDisk();
+  }
+
+  createReviewFetchJob(job: ReviewFetchJob): void {
+    this.syncFromDisk();
+    this.state.reviewFetchJobs = [
+      job,
+      ...this.state.reviewFetchJobs.filter((item) => item.id !== job.id)
+    ];
+    this.flushToDisk();
+  }
+
+  updateReviewFetchJob(
+    jobId: string,
+    patch: Partial<ReviewFetchJob>
+  ): ReviewFetchJob | undefined {
+    this.syncFromDisk();
+    const index = this.state.reviewFetchJobs.findIndex((job) => job.id === jobId);
+    if (index === -1) {
+      return undefined;
+    }
+    const updated: ReviewFetchJob = {
+      ...this.state.reviewFetchJobs[index],
+      ...patch,
+      updatedAt: patch.updatedAt || new Date().toISOString()
+    };
+    this.state.reviewFetchJobs[index] = updated;
+    this.flushToDisk();
+    return updated;
+  }
+
+  getReviewFetchJobById(jobId: string): ReviewFetchJob | undefined {
+    this.syncFromDisk();
+    return this.state.reviewFetchJobs.find((job) => job.id === jobId);
+  }
+
+  listReviewFetchJobsByHotel(hotelId: string, limit = 20): ReviewFetchJob[] {
+    this.syncFromDisk();
+    return this.state.reviewFetchJobs
+      .filter((job) => job.hotelId === hotelId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, Math.max(1, Math.min(100, Math.floor(limit))));
+  }
+
+  createReviewFetchJobSource(source: ReviewFetchJobSource): void {
+    this.syncFromDisk();
+    const existingIndex = this.state.reviewFetchJobSources.findIndex(
+      (item) => item.jobId === source.jobId && item.source === source.source
+    );
+    if (existingIndex === -1) {
+      this.state.reviewFetchJobSources = [source, ...this.state.reviewFetchJobSources];
+    } else {
+      this.state.reviewFetchJobSources[existingIndex] = {
+        ...this.state.reviewFetchJobSources[existingIndex],
+        ...source
+      };
+    }
+    this.flushToDisk();
+  }
+
+  updateReviewFetchJobSource(
+    sourceId: string,
+    patch: Partial<ReviewFetchJobSource>
+  ): ReviewFetchJobSource | undefined {
+    this.syncFromDisk();
+    const index = this.state.reviewFetchJobSources.findIndex((source) => source.id === sourceId);
+    if (index === -1) {
+      return undefined;
+    }
+    const updated: ReviewFetchJobSource = {
+      ...this.state.reviewFetchJobSources[index],
+      ...patch,
+      updatedAt: patch.updatedAt || new Date().toISOString()
+    };
+    this.state.reviewFetchJobSources[index] = updated;
+    this.flushToDisk();
+    return updated;
+  }
+
+  listReviewFetchJobSources(jobId: string): ReviewFetchJobSource[] {
+    this.syncFromDisk();
+    return this.state.reviewFetchJobSources
+      .filter((source) => source.jobId === jobId)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
   upsertAnalytics(
     hotelId: string,
     reviews: Review[],
@@ -256,7 +371,10 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
       analyses: [...this.state.analyses],
       aggregates: [...this.state.aggregates],
       recommendations: [...this.state.recommendations],
-      runs: [...this.state.runs]
+      runs: [...this.state.runs],
+      externalProfiles: [...this.state.externalProfiles],
+      reviewFetchJobs: [...this.state.reviewFetchJobs],
+      reviewFetchJobSources: [...this.state.reviewFetchJobSources]
     };
   }
 
@@ -323,6 +441,20 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
       (item) => !removableHotelIds.has(item.hotelId)
     );
     this.state.runs = this.state.runs.filter((run) => !removableHotelIds.has(run.hotelId));
+    this.state.externalProfiles = this.state.externalProfiles.filter(
+      (profile) => !removableHotelIds.has(profile.hotelId)
+    );
+    const removedJobIds = new Set(
+      this.state.reviewFetchJobs
+        .filter((job) => removableHotelIds.has(job.hotelId))
+        .map((job) => job.id)
+    );
+    this.state.reviewFetchJobs = this.state.reviewFetchJobs.filter(
+      (job) => !removableHotelIds.has(job.hotelId)
+    );
+    this.state.reviewFetchJobSources = this.state.reviewFetchJobSources.filter(
+      (source) => !removedJobIds.has(source.jobId)
+    );
 
     return changed;
   }
@@ -336,8 +468,21 @@ export class InMemoryIntelligenceRepository implements IntelligenceRepository {
       if (!raw.trim()) {
         return null;
       }
-      const parsed = JSON.parse(raw) as MemoryState;
-      return parsed;
+      const parsed = JSON.parse(raw) as Partial<MemoryState>;
+      if (!parsed || typeof parsed !== "object") {
+        return null;
+      }
+      return {
+        hotels: parsed.hotels ?? [],
+        reviews: parsed.reviews ?? [],
+        analyses: parsed.analyses ?? [],
+        aggregates: parsed.aggregates ?? [],
+        recommendations: parsed.recommendations ?? [],
+        runs: parsed.runs ?? [],
+        externalProfiles: parsed.externalProfiles ?? [],
+        reviewFetchJobs: parsed.reviewFetchJobs ?? [],
+        reviewFetchJobSources: parsed.reviewFetchJobSources ?? []
+      };
     } catch {
       return null;
     }

@@ -32,6 +32,32 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_hotels_name_city
 CREATE INDEX IF NOT EXISTS idx_hotels_review_count
   ON hotel_catalog.hotels (review_count DESC);
 
+CREATE TABLE IF NOT EXISTS hotel_catalog.external_profiles (
+  id TEXT PRIMARY KEY,
+  hotel_id TEXT NOT NULL REFERENCES hotel_catalog.hotels(id) ON DELETE CASCADE,
+  source TEXT NOT NULL,
+  external_id TEXT,
+  external_uri TEXT,
+  external_url TEXT,
+  external_name TEXT,
+  external_address TEXT,
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
+  rating DOUBLE PRECISION,
+  reviews_count INTEGER,
+  match_confidence DOUBLE PRECISION,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  last_verified_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_external_profiles_hotel_source
+  ON hotel_catalog.external_profiles (hotel_id, source);
+
+CREATE INDEX IF NOT EXISTS idx_external_profiles_source
+  ON hotel_catalog.external_profiles (source, updated_at DESC);
+
 CREATE TABLE IF NOT EXISTS review_intelligence.reviews (
   id TEXT PRIMARY KEY,
   hotel_id TEXT NOT NULL REFERENCES hotel_catalog.hotels(id) ON DELETE CASCADE,
@@ -119,3 +145,40 @@ CREATE TABLE IF NOT EXISTS review_intelligence.analysis_runs (
 
 CREATE INDEX IF NOT EXISTS idx_analysis_runs_hotel_started
   ON review_intelligence.analysis_runs (hotel_id, started_at DESC);
+
+CREATE TABLE IF NOT EXISTS review_intelligence.review_fetch_jobs (
+  id TEXT PRIMARY KEY,
+  hotel_id TEXT NOT NULL REFERENCES hotel_catalog.hotels(id) ON DELETE CASCADE,
+  trigger_type TEXT NOT NULL,
+  from_date TIMESTAMPTZ,
+  to_date TIMESTAMPTZ,
+  status TEXT NOT NULL,
+  progress_pct DOUBLE PRECISION NOT NULL DEFAULT 0,
+  current_stage TEXT NOT NULL,
+  total_collected INTEGER NOT NULL DEFAULT 0,
+  warning_count INTEGER NOT NULL DEFAULT 0,
+  error_message TEXT,
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_review_fetch_jobs_hotel_created
+  ON review_intelligence.review_fetch_jobs (hotel_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS review_intelligence.review_fetch_job_sources (
+  id TEXT PRIMARY KEY,
+  job_id TEXT NOT NULL REFERENCES review_intelligence.review_fetch_jobs(id) ON DELETE CASCADE,
+  source TEXT NOT NULL,
+  status TEXT NOT NULL,
+  collected_count INTEGER NOT NULL DEFAULT 0,
+  notes TEXT,
+  error_message TEXT,
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_review_fetch_job_sources_job_source
+  ON review_intelligence.review_fetch_job_sources (job_id, source);

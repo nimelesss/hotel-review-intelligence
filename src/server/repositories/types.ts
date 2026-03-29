@@ -4,9 +4,12 @@ import {
   DashboardPayload,
   Hotel,
   HotelAggregate,
+  HotelExternalProfile,
   Recommendation,
   Review,
   ReviewAnalysis,
+  ReviewFetchJob,
+  ReviewFetchJobSource,
   ReviewsQuery,
   ReviewsQueryResult,
   SegmentAnalyticsPayload
@@ -19,6 +22,9 @@ export interface RepositorySnapshot {
   aggregates: HotelAggregate[];
   recommendations: Recommendation[];
   runs: AnalysisRun[];
+  externalProfiles: HotelExternalProfile[];
+  reviewFetchJobs: ReviewFetchJob[];
+  reviewFetchJobSources: ReviewFetchJobSource[];
 }
 
 export interface IntelligenceRepository {
@@ -34,6 +40,21 @@ export interface IntelligenceRepository {
   createRun(run: AnalysisRun): void;
   updateRun(runId: string, patch: Partial<AnalysisRun>): AnalysisRun | undefined;
   getRunById(runId: string): AnalysisRun | undefined;
+  listExternalProfilesByHotel(hotelId: string): HotelExternalProfile[];
+  upsertExternalProfile(profile: HotelExternalProfile): void;
+  createReviewFetchJob(job: ReviewFetchJob): void;
+  updateReviewFetchJob(
+    jobId: string,
+    patch: Partial<ReviewFetchJob>
+  ): ReviewFetchJob | undefined;
+  getReviewFetchJobById(jobId: string): ReviewFetchJob | undefined;
+  listReviewFetchJobsByHotel(hotelId: string, limit?: number): ReviewFetchJob[];
+  createReviewFetchJobSource(source: ReviewFetchJobSource): void;
+  updateReviewFetchJobSource(
+    sourceId: string,
+    patch: Partial<ReviewFetchJobSource>
+  ): ReviewFetchJobSource | undefined;
+  listReviewFetchJobSources(jobId: string): ReviewFetchJobSource[];
   upsertAnalytics(
     hotelId: string,
     reviews: Review[],

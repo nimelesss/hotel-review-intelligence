@@ -228,6 +228,74 @@ export interface AnalysisRun {
   provider?: PlatformProvider;
 }
 
+export type ExternalProfileSource = "yandex" | "2gis";
+
+export interface HotelExternalProfile {
+  id: UUID;
+  hotelId: UUID;
+  source: ExternalProfileSource;
+  externalId?: string;
+  externalUri?: string;
+  externalUrl?: string;
+  externalName?: string;
+  externalAddress?: string;
+  latitude?: number;
+  longitude?: number;
+  rating?: number;
+  reviewsCount?: number;
+  matchConfidence?: number;
+  isActive: boolean;
+  lastVerifiedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ReviewFetchJobStatus = "queued" | "running" | "completed" | "failed";
+
+export type ReviewFetchJobStage =
+  | "queued"
+  | "resolving_profiles"
+  | "fetching_reviews"
+  | "normalizing_reviews"
+  | "deduping_reviews"
+  | "analyzing_reviews"
+  | "aggregating_insights"
+  | "completed"
+  | "failed";
+
+export type ReviewFetchJobTriggerType = "manual" | "scheduled";
+
+export interface ReviewFetchJob {
+  id: UUID;
+  hotelId: UUID;
+  triggerType: ReviewFetchJobTriggerType;
+  fromDate?: string;
+  toDate?: string;
+  status: ReviewFetchJobStatus;
+  progressPct: number;
+  currentStage: ReviewFetchJobStage;
+  totalCollected: number;
+  warningCount: number;
+  errorMessage?: string;
+  startedAt?: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReviewFetchJobSource {
+  id: UUID;
+  jobId: UUID;
+  source: ExternalProfileSource;
+  status: ReviewFetchJobStatus;
+  collectedCount: number;
+  notes?: string;
+  errorMessage?: string;
+  startedAt?: string;
+  completedAt?: string;
+  updatedAt: string;
+}
+
 export interface ExecutiveSummary {
   averageRating: number;
   totalReviews: number;
