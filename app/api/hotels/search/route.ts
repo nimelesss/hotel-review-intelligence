@@ -268,7 +268,6 @@ function dedupeScoredEntries(entries: ScoredSearchEntry[]): ScoredSearchEntry[] 
 
 function makeResultKey(item: HotelSearchResult): string {
   return [
-    normalize(item.externalId || ""),
     normalize(item.name || ""),
     normalize(item.city || ""),
     normalize(item.address || "")
