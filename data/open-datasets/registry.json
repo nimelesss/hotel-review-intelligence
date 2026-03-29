@@ -54,6 +54,27 @@
         "sentimentLabel": "Label"
       },
       "notes": "В текущем виде нет устойчивой привязки к объекту размещения (hotel identity), поэтому источник обычно отклоняется."
+    },
+    {
+      "id": "manual:courtyard-rostov-screenshots-2026-03",
+      "provider": "manual",
+      "role": [
+        "reviews",
+        "catalog"
+      ],
+      "localPath": "data/external/manual/courtyard-rostov/reviews_from_screenshots.csv",
+      "format": "csv",
+      "encoding": "utf-8",
+      "snapshotDate": "2026-03-29",
+      "fieldHints": {
+        "hotelName": "name",
+        "address": "address",
+        "rating": "rating",
+        "rubrics": "rubrics",
+        "reviewText": "text",
+        "reviewDate": "review_date"
+      },
+      "notes": "Curated reviews from user-provided screenshots (Yandex + 2GIS) for Courtyard Rostov-on-Don MVP dataset."
     }
   ]
 }
