@@ -13,200 +13,32 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Deploy to VPS
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Validate build on runner
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Deploy to VPS over SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           port: ${{ secrets.VPS_PORT || 22 }}
-          script_stop: false
-          command_timeout: 18m
-          script: |
-            set -euo pipefail
-            
-            echo "=== Starting deployment ==="
-            cd /srv/hotel-review-intelligence
-            
-            # Pull latest changes
-            echo "Pulling latest changes..."
-            git fetch origin main
-            git reset --hard origin/main
-
-            # Stop service before mutating runtime DB files
-            echo "Stopping service before build/restore..."
-            systemctl stop hotel-review-intelligence || true
-            
-            # Clean build artifacts
-            echo "Cleaning build artifacts..."
-            rm -rf .next node_modules
-            
-            install_deps() {
-              echo "Installing dependencies..."
-              local attempt=1
-              while [ "$attempt" -le 3 ]; do
-                echo "npm ci attempt ${attempt}/3"
-                if npm ci --no-audit --no-fund && verify_node_modules; then
-                  return 0
-                fi
-                echo "npm install validation failed on attempt ${attempt}; cleaning node_modules and npm cache"
-                rm -rf node_modules
-                npm cache clean --force || true
-                attempt=$((attempt + 1))
-              done
-              return 1
-            }
-
-            verify_node_modules() {
-              echo "Validating node_modules integrity..."
-              if [ ! -f node_modules/better-sqlite3/package.json ]; then
-                echo "Missing better-sqlite3 package.json"
-                return 1
-              fi
-              if [ ! -f node_modules/next/package.json ]; then
-                echo "Missing next package.json"
-                return 1
-              fi
-              node -e "require.resolve('better-sqlite3'); require.resolve('next'); console.log('module-resolve-ok')" >/tmp/hri_module_check.log 2>&1 || {
-                echo "Node module resolve failed:"
-                cat /tmp/hri_module_check.log || true
-                return 1
-              }
-              return 0
-            }
-            
-            # Restore database from seed
-            restore_db() {
-              echo "Restoring database..."
-              node scripts/restore-runtime-db-from-seed.mjs
-            }
-            
-            # Build application
-            build_app() {
-              echo "Building application..."
-              npm run build
-            }
-            
-            # Restart service
-            restart_service() {
-              echo "Restarting service..."
-              systemctl daemon-reload
-              systemctl restart hotel-review-intelligence
-            }
-            
-            # Wait for service to be healthy
-            wait_for_service() {
-              echo "Waiting for service health..."
-              for i in $(seq 1 45); do
-                if systemctl is-active --quiet hotel-review-intelligence; then
-                  echo "Service is active after ${i}s"
-                  return 0
-                fi
-                sleep 1
-              done
-              return 1
-            }
-            
-            # Verify service is running
-            verify_service_active() {
-              if ! systemctl is-active --quiet hotel-review-intelligence; then
-                echo "ERROR: Service failed to start"
-                systemctl status hotel-review-intelligence --no-pager
-                return 1
-              fi
-              return 0
-            }
-            
-            # Health check
-            wait_for_hotels_api() {
-              echo "Running hotels API health checks..."
-              for i in $(seq 1 35); do
-                if curl -fsS --max-time 6 http://127.0.0.1:3100/api/hotels >/dev/null 2>&1; then
-                  echo "API health-check passed after ${i} attempts"
-                  return 0
-                fi
-                sleep 2
-              done
-              return 1
-            }
-            
-            # Final verification
-            verify_dashboard_api() {
-              local hotel_ids
-              hotel_ids=$(curl -fsS --max-time 8 http://127.0.0.1:3100/api/hotels | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);const ids=(j.items||[]).slice(0,8).map(x=>x.id).filter(Boolean);process.stdout.write(ids.join('\n'));}catch{process.stdout.write('');}})")
-              if [ -z "$hotel_ids" ]; then
-                echo "ERROR: Could not resolve candidate hotel ids from /api/hotels"
-                return 1
-              fi
-
-              local attempt
-              for attempt in $(seq 1 20); do
-                for hotel_id in $hotel_ids; do
-                  [ -z "$hotel_id" ] && continue
-                  local status
-                  status=$(curl -sS --max-time 8 -o /tmp/hri_dashboard_probe.json -w '%{http_code}' "http://127.0.0.1:3100/api/hotels/${hotel_id}/dashboard" || true)
-                  if [ "$status" = "200" ]; then
-                    echo "Dashboard probe passed on attempt ${attempt} for hotel ${hotel_id}"
-                    return 0
-                  fi
-                done
-                sleep 2
-              done
-
-              echo "ERROR: Dashboard probe failed for all candidate hotels"
-              echo "Last dashboard response:"
-              head -c 300 /tmp/hri_dashboard_probe.json || true
-              echo
-              return 1
-            }
-
-            run_core_checks() {
-              wait_for_service &&
-              verify_service_active &&
-              wait_for_hotels_api
-            }
-
-            install_deps
-            restore_db
-            build_app
-            restart_service
-
-            if ! run_core_checks; then
-              echo "Primary core verification failed. Running self-heal cycle (restore + restart) once..."
-              systemctl stop hotel-review-intelligence || true
-              restore_db
-              restart_service
-              if ! run_core_checks; then
-                echo "ERROR: Core verification failed after self-heal cycle"
-                systemctl status hotel-review-intelligence --no-pager || true
-                journalctl -u hotel-review-intelligence -n 120 --no-pager || true
-                exit 1
-              fi
-            fi
-
-            if ! verify_dashboard_api; then
-              echo "Dashboard probe failed. Running one dashboard self-heal cycle..."
-              systemctl stop hotel-review-intelligence || true
-              restore_db
-              restart_service
-              if ! run_core_checks; then
-                echo "ERROR: Core verification failed during dashboard self-heal cycle"
-                systemctl status hotel-review-intelligence --no-pager || true
-                journalctl -u hotel-review-intelligence -n 120 --no-pager || true
-                exit 1
-              fi
-              if ! verify_dashboard_api; then
-                echo "WARNING: Dashboard probe still failing after self-heal, but core service is healthy. Proceeding deployment."
-                systemctl status hotel-review-intelligence --no-pager || true
-                journalctl -u hotel-review-intelligence -n 80 --no-pager || true
-              fi
-            fi
-            
-            echo "=== Deployment completed successfully ==="
+          script_stop: true
+          command_timeout: 30m
+          script_path: scripts/deploy-vps.sh
