@@ -64,3 +64,11 @@ npm run catalog:refresh -- --output data/russia-hotels-catalog.json --maxTiles 2
 ## Ограничения
 - Реальный охват отзывов зависит от подключенных источников (dataset URL или Apify actors).
 - В MVP используется file-based runtime store; PostgreSQL можно подключить без смены API-контрактов.
+
+## Review fetch jobs API
+- `POST /api/review-fetch-jobs` - start async collection job for one hotel.
+- `GET /api/review-fetch-jobs?hotelId=...` - list recent jobs and per-source status.
+- `GET /api/review-fetch-jobs/:jobId` - job details with stages and source breakdown.
+
+Realtime sync now uses staged pipeline:
+`resolving_profiles -> fetching_reviews -> normalizing_reviews -> deduping_reviews -> analyzing_reviews -> aggregating_insights -> completed`.
