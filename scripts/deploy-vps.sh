@@ -7,6 +7,7 @@ SERVICE_NAME="hotel-review-intelligence"
 LOCK_FILE="/tmp/hri-deploy.lock"
 MAX_NPM_ATTEMPTS=3
 NODE_HEAP_MB="${NODE_HEAP_MB:-1536}"
+LOCK_WAIT_SECONDS="${LOCK_WAIT_SECONDS:-900}"
 
 log() {
   printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
@@ -37,9 +38,13 @@ require_cmd() {
 acquire_lock() {
   require_cmd flock
   exec 9>"$LOCK_FILE"
-  if ! flock -n 9; then
-    fail "Another deployment is running (lock: $LOCK_FILE)"
+  log "Acquiring deployment lock: $LOCK_FILE (timeout: ${LOCK_WAIT_SECONDS}s)"
+  if ! flock -w "$LOCK_WAIT_SECONDS" 9; then
+    log "Lock wait timed out. Possible active deploy process:"
+    pgrep -af 'deploy-vps.sh|npm run build|next build|drone-ssh|appleboy' || true
+    fail "Could not acquire deployment lock within ${LOCK_WAIT_SECONDS}s"
   fi
+  log "Deployment lock acquired"
 }
 
 assert_environment() {
