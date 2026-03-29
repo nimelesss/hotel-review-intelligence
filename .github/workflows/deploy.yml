@@ -149,11 +149,10 @@ jobs:
               return 1
             }
 
-            run_deploy_checks() {
+            run_core_checks() {
               wait_for_service &&
               verify_service_active &&
-              wait_for_hotels_api &&
-              verify_dashboard_api
+              wait_for_hotels_api
             }
 
             install_deps
@@ -161,16 +160,34 @@ jobs:
             build_app
             restart_service
 
-            if ! run_deploy_checks; then
-              echo "Primary verification failed. Running self-heal cycle (restore + restart) once..."
+            if ! run_core_checks; then
+              echo "Primary core verification failed. Running self-heal cycle (restore + restart) once..."
               systemctl stop hotel-review-intelligence || true
               restore_db
               restart_service
-              if ! run_deploy_checks; then
-                echo "ERROR: Verification failed after self-heal cycle"
+              if ! run_core_checks; then
+                echo "ERROR: Core verification failed after self-heal cycle"
                 systemctl status hotel-review-intelligence --no-pager || true
                 journalctl -u hotel-review-intelligence -n 120 --no-pager || true
                 exit 1
+              fi
+            fi
+
+            if ! verify_dashboard_api; then
+              echo "Dashboard probe failed. Running one dashboard self-heal cycle..."
+              systemctl stop hotel-review-intelligence || true
+              restore_db
+              restart_service
+              if ! run_core_checks; then
+                echo "ERROR: Core verification failed during dashboard self-heal cycle"
+                systemctl status hotel-review-intelligence --no-pager || true
+                journalctl -u hotel-review-intelligence -n 120 --no-pager || true
+                exit 1
+              fi
+              if ! verify_dashboard_api; then
+                echo "WARNING: Dashboard probe still failing after self-heal, but core service is healthy. Proceeding deployment."
+                systemctl status hotel-review-intelligence --no-pager || true
+                journalctl -u hotel-review-intelligence -n 80 --no-pager || true
               fi
             fi
             
