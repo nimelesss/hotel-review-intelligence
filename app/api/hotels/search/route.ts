@@ -173,9 +173,9 @@ function scoreBySingleQuery(
   query: string
 ): number {
   const q = normalize(query);
-  const name = normalize(hotel.name);
-  const city = normalize(hotel.city);
-  const address = normalize(hotel.address);
+  const nameVariants = buildTextVariants(hotel.name);
+  const cityVariants = buildTextVariants(hotel.city);
+  const addressVariants = buildTextVariants(hotel.address);
   const tokens = q.split(" ").filter(Boolean);
 
   if (!q) {
@@ -183,26 +183,55 @@ function scoreBySingleQuery(
   }
 
   let score = 0;
-  if (name === q) score += 160;
-  if (name.startsWith(q)) score += 120;
-  if (name.includes(q)) score += 70;
-  if (city.includes(q)) score += 30;
-  if (address.includes(q)) score += 18;
+  if (matchesExactly(nameVariants, q)) score += 160;
+  if (matchesStartsWith(nameVariants, q)) score += 120;
+  if (matchesIncludes(nameVariants, q)) score += 70;
+  if (matchesIncludes(cityVariants, q)) score += 30;
+  if (matchesIncludes(addressVariants, q)) score += 18;
 
   for (const token of tokens) {
     if (token.length < 2) {
       continue;
     }
-    if (name.includes(token)) score += 24;
-    if (city.includes(token)) score += 12;
-    if (address.includes(token)) score += 6;
+    if (matchesIncludes(nameVariants, token)) score += 24;
+    if (matchesIncludes(cityVariants, token)) score += 12;
+    if (matchesIncludes(addressVariants, token)) score += 6;
   }
 
-  if (tokens.length > 1 && tokens.every((token) => name.includes(token) || city.includes(token))) {
+  if (
+    tokens.length > 1 &&
+    tokens.every(
+      (token) => matchesIncludes(nameVariants, token) || matchesIncludes(cityVariants, token)
+    )
+  ) {
     score += 35;
   }
 
   return score;
+}
+
+function buildTextVariants(value: string): string[] {
+  const normalized = normalize(value);
+  const variants = [
+    normalized,
+    normalize(replaceBrandAliases(normalized)),
+    normalize(transliterateCyrillicToLatin(normalized)),
+    normalize(replaceBrandAliases(transliterateCyrillicToLatin(normalized)))
+  ].filter((item) => item.length > 0);
+
+  return [...new Set(variants)];
+}
+
+function matchesExactly(variants: string[], query: string): boolean {
+  return variants.some((variant) => variant === query);
+}
+
+function matchesStartsWith(variants: string[], query: string): boolean {
+  return variants.some((variant) => variant.startsWith(query));
+}
+
+function matchesIncludes(variants: string[], query: string): boolean {
+  return variants.some((variant) => variant.includes(query));
 }
 
 function buildQueryVariants(query: string): string[] {
