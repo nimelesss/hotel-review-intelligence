@@ -39,6 +39,10 @@ jobs:
             echo "Pulling latest changes..."
             git fetch origin main
             git reset --hard origin/main
+
+            # Stop service before mutating runtime DB files
+            echo "Stopping service before build/restore..."
+            systemctl stop hotel-review-intelligence || true
             
             # Clean build artifacts
             echo "Cleaning build artifacts..."
@@ -91,6 +95,17 @@ jobs:
             # Final verification
             if ! curl -fsS http://127.0.0.1:3100/api/hotels >/dev/null 2>&1; then
               echo "ERROR: Health check failed"
+              exit 1
+            fi
+
+            # Deep verification: dashboard endpoint should read runtime DB without corruption
+            TOP_HOTEL_ID=$(curl -fsS http://127.0.0.1:3100/api/hotels | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const j=JSON.parse(d);process.stdout.write(j.items?.[0]?.id||'');}catch{process.stdout.write('');}})")
+            if [ -z \"$TOP_HOTEL_ID\" ]; then
+              echo "ERROR: Could not resolve top hotel id from API"
+              exit 1
+            fi
+            if ! curl -fsS \"http://127.0.0.1:3100/api/hotels/${TOP_HOTEL_ID}/dashboard\" >/dev/null 2>&1; then
+              echo "ERROR: Dashboard endpoint failed for hotel ${TOP_HOTEL_ID}"
               exit 1
             fi
             
