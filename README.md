@@ -72,3 +72,18 @@ npm run catalog:refresh -- --output data/russia-hotels-catalog.json --maxTiles 2
 
 Realtime sync now uses staged pipeline:
 `resolving_profiles -> fetching_reviews -> normalizing_reviews -> deduping_reviews -> analyzing_reviews -> aggregating_insights -> completed`.
+
+## Seed DB snapshot without Git LFS
+For large SQLite runtime DBs we store compressed snapshots in git:
+- `src/data/seeds/runtime-db/hotel_catalog.sqlite.gz`
+- `src/data/seeds/runtime-db/review_intelligence.sqlite.gz`
+
+Refresh snapshots from current runtime DB:
+```bash
+npm run db:snapshot-seed
+```
+
+Restore runtime DB from committed snapshots:
+```bash
+npm run db:restore-seed
+```

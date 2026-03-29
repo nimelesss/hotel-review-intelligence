@@ -10,6 +10,7 @@ data/runtime/
 data/open-datasets/discovery-report.json
 data/open-datasets/profile-report.json
 data/open-datasets/import-summary.json
+data/*.sqlite
 tmp_hf_info.json
 .hotel-search-cache.json
 .env
