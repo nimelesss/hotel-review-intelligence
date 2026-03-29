@@ -51,17 +51,35 @@ jobs:
             install_deps() {
               echo "Installing dependencies..."
               local attempt=1
-              while [ "$attempt" -le 2 ]; do
-                echo "npm ci attempt ${attempt}/2"
-                if npm ci --no-audit --no-fund; then
+              while [ "$attempt" -le 3 ]; do
+                echo "npm ci attempt ${attempt}/3"
+                if npm ci --no-audit --no-fund && verify_node_modules; then
                   return 0
                 fi
-                echo "npm ci failed on attempt ${attempt}; cleaning node_modules and npm cache"
+                echo "npm install validation failed on attempt ${attempt}; cleaning node_modules and npm cache"
                 rm -rf node_modules
                 npm cache clean --force || true
                 attempt=$((attempt + 1))
               done
               return 1
+            }
+
+            verify_node_modules() {
+              echo "Validating node_modules integrity..."
+              if [ ! -f node_modules/better-sqlite3/package.json ]; then
+                echo "Missing better-sqlite3 package.json"
+                return 1
+              fi
+              if [ ! -f node_modules/next/package.json ]; then
+                echo "Missing next package.json"
+                return 1
+              fi
+              node -e "require.resolve('better-sqlite3'); require.resolve('next'); console.log('module-resolve-ok')" >/tmp/hri_module_check.log 2>&1 || {
+                echo "Node module resolve failed:"
+                cat /tmp/hri_module_check.log || true
+                return 1
+              }
+              return 0
             }
             
             # Restore database from seed
