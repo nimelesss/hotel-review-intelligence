@@ -1,11 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
+import crypto from "node:crypto";
 import Database from "better-sqlite3";
 
 const ROOT = process.cwd();
 const RUNTIME_DIR = path.join(ROOT, "data", "runtime");
 const SEED_DIR = path.join(ROOT, "src", "data", "seeds", "runtime-db");
+const SEED_MANIFEST_PATH = path.join(RUNTIME_DIR, ".seed-manifest.json");
+const SEARCH_CACHE_PATH = path.join(ROOT, ".hotel-search-cache.json");
 
 const targets = [
   {
@@ -59,6 +62,13 @@ function purgeSqliteSidecars(dbPath) {
 }
 
 function shouldRestore(target) {
+  const currentManifest = buildSeedManifest();
+  const previousManifest = readSeedManifest();
+
+  if (hasSeedChanged(previousManifest, currentManifest, target.name)) {
+    return true;
+  }
+
   if (!fs.existsSync(target.runtimePath)) {
     return true;
   }
@@ -102,6 +112,55 @@ function shouldRestore(target) {
   }
 
   return false;
+}
+
+function readSeedManifest() {
+  try {
+    if (!fs.existsSync(SEED_MANIFEST_PATH)) {
+      return null;
+    }
+    return JSON.parse(fs.readFileSync(SEED_MANIFEST_PATH, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function buildSeedManifest() {
+  return {
+    generatedAt: new Date().toISOString(),
+    targets: Object.fromEntries(
+      targets.map((target) => [
+        target.name,
+        {
+          seedPath: path.relative(ROOT, target.seedPath),
+          size: fileSize(target.seedPath),
+          sha256: sha256File(target.seedPath)
+        }
+      ])
+    )
+  };
+}
+
+function hasSeedChanged(previousManifest, currentManifest, targetName) {
+  const previous = previousManifest?.targets?.[targetName];
+  const current = currentManifest?.targets?.[targetName];
+  if (!previous || !current) {
+    return true;
+  }
+
+  return previous.sha256 !== current.sha256 || previous.size !== current.size;
+}
+
+function sha256File(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return "";
+  }
+
+  return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+}
+
+function writeSeedManifest(manifest) {
+  fs.writeFileSync(SEED_MANIFEST_PATH, JSON.stringify(manifest, null, 2), "utf8");
 }
 
 function validateCrossDbConsistency() {
@@ -263,12 +322,15 @@ function verifyRuntimeTarget(target) {
 function main() {
   ensureDirectory(RUNTIME_DIR);
   const force = process.argv.includes("--force");
+  const manifest = buildSeedManifest();
+  let cacheShouldReset = false;
 
   const summary = [];
   targets.forEach((target) => {
     const before = fileSize(target.runtimePath);
     if (force || shouldRestore(target)) {
       restoreFromSeed(target);
+      cacheShouldReset = true;
       summary.push({
         target: target.name,
         action: "restored",
@@ -290,6 +352,7 @@ function main() {
     targets.forEach((target) => {
       restoreFromSeed(target);
     });
+    cacheShouldReset = true;
     summary.push({
       target: "cross-db-consistency",
       action: "restored_all",
@@ -309,6 +372,17 @@ function main() {
     updatedRows: reconcile.updated,
     hotelsWithReviews: reconcile.hotelsWithReviews
   });
+
+  if (cacheShouldReset) {
+    removeIfExists(SEARCH_CACHE_PATH);
+    summary.push({
+      target: "hotel_search_cache",
+      action: "reset",
+      path: path.relative(ROOT, SEARCH_CACHE_PATH)
+    });
+  }
+
+  writeSeedManifest(manifest);
 
   const out = {
     restoredAt: new Date().toISOString(),

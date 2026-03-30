@@ -99,18 +99,10 @@ is_valid_json_file() {
   node -e "const fs=require('fs');const p=process.argv[1];JSON.parse(fs.readFileSync(p,'utf8'));" "$file" >/dev/null 2>&1
 }
 
-restore_runtime_db_if_needed() {
+sync_runtime_db_from_seed() {
   cd "$APP_DIR"
-
-  if is_valid_json_file ".runtime-store.json" && is_valid_json_file ".hotel-search-cache.json"; then
-    log "Runtime store files are valid, skipping DB restore"
-    return 0
-  fi
-
-  log "Runtime store files missing/corrupted, restoring from seed"
+  log "Synchronizing runtime SQLite databases with committed seed snapshots"
   node scripts/restore-runtime-db-from-seed.mjs
-
-  is_valid_json_file ".runtime-store.json" || fail "Runtime store is still invalid after restore"
 }
 
 build_app() {
@@ -211,12 +203,12 @@ main() {
 
   # Keep downtime minimal: stop/restart only after successful build.
   systemctl stop "$SERVICE_NAME" || true
-  restore_runtime_db_if_needed
+  sync_runtime_db_from_seed
 
   if ! restart_and_verify; then
     log "Primary verification failed, running one self-heal cycle"
     systemctl stop "$SERVICE_NAME" || true
-    restore_runtime_db_if_needed
+    sync_runtime_db_from_seed
     restart_and_verify || fail "Deployment failed after self-heal cycle"
   fi
 
