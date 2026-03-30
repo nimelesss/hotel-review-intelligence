@@ -13,6 +13,7 @@ import { SENTIMENT_LABELS, SEGMENT_LABELS, TOPIC_LABELS } from "@/shared/config/
 import { formatDate, formatPercent, formatRating } from "@/shared/lib/format";
 import { fetchJson } from "@/shared/lib/http";
 import { riskVariant, sentimentVariant } from "@/shared/lib/presentation";
+import { stripAccommodationWords } from "@/shared/lib/text";
 import { AnalysisProgress } from "@/shared/ui/analysis-progress";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -930,6 +931,10 @@ function scoreExistingHotel(hotel: Hotel, candidate: HotelSearchResult): number 
     score += 50;
   }
 
+  if (normalizeKey(hotel.address) === normalizeKey(candidate.address || "")) {
+    score += 80;
+  }
+
   if ((hotel.reviewCount ?? 0) > 0) {
     score += 20;
   }
@@ -942,13 +947,32 @@ function scoreExistingHotel(hotel: Hotel, candidate: HotelSearchResult): number 
 function buildHotelMatchKeys(name: string, city: string): Set<string> {
   const baseName = normalizeKey(name);
   const baseFull = normalizeKey(`${name} ${city}`);
+  const strippedName = normalizeKey(stripAccommodationWords(name));
+  const strippedFull = normalizeKey(stripAccommodationWords(`${name} ${city}`));
   const aliasName = replaceBrandAliases(baseName);
   const aliasFull = replaceBrandAliases(baseFull);
+  const aliasStrippedName = replaceBrandAliases(strippedName);
+  const aliasStrippedFull = replaceBrandAliases(strippedFull);
   const translitName = transliterateCyrillicToLatin(aliasName);
   const translitFull = transliterateCyrillicToLatin(aliasFull);
+  const translitStrippedName = transliterateCyrillicToLatin(aliasStrippedName);
+  const translitStrippedFull = transliterateCyrillicToLatin(aliasStrippedFull);
 
   return new Set(
-    [baseName, baseFull, aliasName, aliasFull, translitName, translitFull].filter(
+    [
+      baseName,
+      baseFull,
+      strippedName,
+      strippedFull,
+      aliasName,
+      aliasFull,
+      aliasStrippedName,
+      aliasStrippedFull,
+      translitName,
+      translitFull,
+      translitStrippedName,
+      translitStrippedFull
+    ].filter(
       (value) => value.length >= 2
     )
   );

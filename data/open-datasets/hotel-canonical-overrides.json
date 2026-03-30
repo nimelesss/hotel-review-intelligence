@@ -1,0 +1,21 @@
+[
+  {
+    "id": "hotel-1865338827",
+    "canonicalName": "Кортъярд Отель",
+    "canonicalCity": "Ростов-на-Дону",
+    "canonicalAddress": "Ростов-на-Дону, Левобережная 2К",
+    "match": {
+      "city": "Ростов-на-Дону",
+      "names": [
+        "Кортъярд",
+        "Кортъярд Отель",
+        "Courtyard by Marriott Rostov-on-Don",
+        "Courtyard Rostov-on-Don"
+      ],
+      "addresses": [
+        "Ростов-на-Дону, Левобережная улица, 2К",
+        "Ростов-на-Дону, Левобережная 2К"
+      ]
+    }
+  }
+]

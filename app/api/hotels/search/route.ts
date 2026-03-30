@@ -5,7 +5,11 @@ import {
   hydrateHotelCatalogFromRemoteSource,
   searchHotelCatalog
 } from "@/server/search/hotel-search-cache";
-import { normalizeSearchText, normalizeWhitespace } from "@/shared/lib/text";
+import {
+  normalizeSearchText,
+  normalizeWhitespace,
+  stripAccommodationWords
+} from "@/shared/lib/text";
 
 const REPOSITORY_INDEX_TTL_MS = 30_000;
 
@@ -104,7 +108,8 @@ function getRepositoryIndex(): IndexedRepositoryHotel[] {
       item,
       nameVariants: buildTextVariants(item.name),
       cityVariants: buildTextVariants(item.city),
-      addressVariants: buildTextVariants(item.address)
+      addressVariants: buildTextVariants(item.address),
+      reviewCount: hotel.reviewCount ?? 0
     } satisfies IndexedRepositoryHotel;
   });
 
@@ -118,6 +123,10 @@ function scoreIndexedHotel(indexed: IndexedRepositoryHotel, queryVariants: strin
   queryVariants.forEach((variant) => {
     maxScore = Math.max(maxScore, scoreBySingleQueryWithVariants(indexed, variant));
   });
+
+  if (maxScore > 0) {
+    maxScore += Math.min(indexed.reviewCount, 200) * 0.25;
+  }
 
   return maxScore;
 }
@@ -199,10 +208,14 @@ function scoreBySingleQueryWithVariants(
 
 function buildTextVariants(value: string): string[] {
   const normalized = normalize(value);
+  const stripped = stripAccommodationWords(value);
   const variants = [
     normalized,
+    stripped,
     normalize(replaceBrandAliases(normalized)),
-    normalize(replaceLatinBrandAliases(normalized))
+    normalize(replaceLatinBrandAliases(normalized)),
+    normalize(replaceBrandAliases(stripped)),
+    normalize(replaceLatinBrandAliases(stripped))
   ].filter((item) => item.length > 0);
 
   return [...new Set(variants)];
@@ -268,7 +281,7 @@ function dedupeScoredEntries(entries: ScoredSearchEntry[]): ScoredSearchEntry[] 
 
 function makeResultKey(item: HotelSearchResult): string {
   return [
-    normalize(item.name || ""),
+    normalize(stripAccommodationWords(item.name || "") || item.name || ""),
     normalize(item.city || "")
   ].join("|");
 }
@@ -283,6 +296,7 @@ interface IndexedRepositoryHotel {
   nameVariants: string[];
   cityVariants: string[];
   addressVariants: string[];
+  reviewCount: number;
 }
 
 function normalize(value: string): string {

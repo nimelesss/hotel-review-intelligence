@@ -44,6 +44,33 @@ export function normalizeSearchText(input: string): string {
   );
 }
 
+const ACCOMMODATION_GENERIC_TOKENS = new Set([
+  "\u043e\u0442\u0435\u043b\u044c",
+  "\u0433\u043e\u0441\u0442\u0438\u043d\u0438\u0446\u0430",
+  "\u0433\u043e\u0441\u0442\u0435\u0432\u043e\u0439",
+  "\u0434\u043e\u043c",
+  "\u0430\u043f\u0430\u0440\u0442-\u043e\u0442\u0435\u043b\u044c",
+  "\u0430\u043f\u0430\u0440\u0442\u043e\u0442\u0435\u043b\u044c",
+  "\u0430\u043f\u0430\u0440\u0442",
+  "hotel",
+  "hostel",
+  "inn"
+]);
+
+export function stripAccommodationWords(input: string): string {
+  const normalized = normalizeSearchText(input);
+  if (!normalized) {
+    return "";
+  }
+
+  const stripped = normalized
+    .split(" ")
+    .filter((token) => token && !ACCOMMODATION_GENERIC_TOKENS.has(token))
+    .join(" ");
+
+  return normalizeWhitespace(stripped || normalized);
+}
+
 function decodeOnePass(input: string): string {
   if (!input.includes("\\u") && !input.includes("\\x")) {
     return input;

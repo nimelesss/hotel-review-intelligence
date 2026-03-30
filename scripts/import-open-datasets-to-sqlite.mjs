@@ -8,6 +8,10 @@ import { parse } from "csv-parse";
 const REGISTRY_PATH = path.resolve(process.cwd(), "data/open-datasets/registry.json");
 const PROFILE_PATH = path.resolve(process.cwd(), "data/open-datasets/profile-report.json");
 const SUMMARY_PATH = path.resolve(process.cwd(), "data/open-datasets/import-summary.json");
+const CANONICAL_OVERRIDES_PATH = path.resolve(
+  process.cwd(),
+  "data/open-datasets/hotel-canonical-overrides.json"
+);
 
 const FROM_DATE = new Date("2022-01-01T00:00:00.000Z");
 const INSERT_BATCH_SIZE = Number(process.env.OPEN_DATASET_INSERT_BATCH || 2000);
@@ -34,6 +38,7 @@ const ACCOMMODATION_MARKERS = [
 async function main() {
   const registry = readJson(REGISTRY_PATH);
   const profile = fs.existsSync(PROFILE_PATH) ? readJson(PROFILE_PATH) : null;
+  const canonicalOverrides = loadCanonicalOverrides();
 
   const paths = getSqlitePaths();
   ensureDirectory(paths.catalogPath);
@@ -226,23 +231,31 @@ async function main() {
         continue;
       }
 
-      const city = extractCity(address) || "Россия";
-      const hotelKey = `${normalizeForKey(hotelName)}|${normalizeForKey(city)}`;
-      const hotelId = `hotel-${stableHash(hotelKey)}`;
+      const baseCity = extractCity(address) || "\u0420\u043e\u0441\u0441\u0438\u044f";
+      const override = findCanonicalOverride(canonicalOverrides, {
+        hotelName,
+        city: baseCity,
+        address
+      });
+      const effectiveName = override?.canonicalName || hotelName;
+      const effectiveCity = override?.canonicalCity || baseCity;
+      const effectiveAddress = override?.canonicalAddress || address;
+      const hotelKey = `${normalizeForKey(effectiveName)}|${normalizeForKey(effectiveCity)}`;
+      const hotelId = override?.id || `hotel-${stableHash(hotelKey)}`;
 
       if (!knownHotelIds.has(hotelId)) {
         knownHotelIds.add(hotelId);
         pendingHotels.push({
           id: hotelId,
           external_id: null,
-          name: hotelName,
-          normalized_name: normalizeForKey(hotelName),
-          brand: inferBrand(hotelName),
-          city,
-          normalized_city: normalizeForKey(city),
-          country: "Россия",
-          category: inferCategory(hotelName, rubrics),
-          address: address || `${hotelName}, ${city}`,
+          name: effectiveName,
+          normalized_name: normalizeForKey(effectiveName),
+          brand: inferBrand(effectiveName),
+          city: effectiveCity,
+          normalized_city: normalizeForKey(effectiveCity),
+          country: "\u0420\u043e\u0441\u0441\u0438\u044f",
+          category: inferCategory(effectiveName, rubrics),
+          address: effectiveAddress || `${effectiveName}, ${effectiveCity}`,
           coordinates_lat: null,
           coordinates_lon: null,
           aliases: "[]",
@@ -260,7 +273,7 @@ async function main() {
       pendingReviews.push({
         id: reviewId,
         hotel_id: hotelId,
-        source: source.id.includes("yandex") ? "yandex" : "manual_upload",
+        source: resolveReviewSource(row.source, source.id),
         source_review_id: sourceReviewId,
         review_date: reviewDate,
         rating: ratingValue,
@@ -268,7 +281,7 @@ async function main() {
         text,
         cleaned_text: cleanedText,
         language: "ru",
-        author_name: null,
+        author_name: normalizeWhitespace(asString(row.author ?? row.author_name ?? "")) || null,
         stay_type_raw: rubrics || null,
         text_hash: textHash,
         created_at: sourceNow,
@@ -415,6 +428,38 @@ function resolveAcceptedCatalogSources(registry, profile) {
   return datasets.filter((item) => acceptedIds.has(item.id));
 }
 
+function loadCanonicalOverrides() {
+  if (!fs.existsSync(CANONICAL_OVERRIDES_PATH)) {
+    return [];
+  }
+
+  const raw = readJson(CANONICAL_OVERRIDES_PATH);
+  return Array.isArray(raw) ? raw : [];
+}
+
+function findCanonicalOverride(overrides, input) {
+  const hotelName = normalizeForKey(input.hotelName);
+  const city = normalizeForKey(input.city);
+  const address = normalizeForKey(input.address);
+
+  return overrides.find((override) => {
+    const match = override?.match || {};
+    const matchCity = normalizeForKey(match.city || "");
+    const nameMatches = Array.isArray(match.names)
+      ? match.names.some((item) => normalizeForKey(item) === hotelName)
+      : false;
+    const addressMatches = Array.isArray(match.addresses)
+      ? match.addresses.some((item) => normalizeForKey(item) === address)
+      : false;
+
+    if (matchCity && matchCity !== city) {
+      return false;
+    }
+
+    return nameMatches || addressMatches;
+  });
+}
+
 async function* readCsvRows(filePath) {
   const parser = parse({
     columns: true,
@@ -454,6 +499,23 @@ function parseRating(raw) {
     return NaN;
   }
   return Math.round(normalized * 100) / 100;
+}
+
+function resolveReviewSource(rowSource, datasetId) {
+  const source = normalizeForKey(asString(rowSource));
+  const dataset = normalizeForKey(asString(datasetId));
+
+  if (source.includes("2gis") || source.includes("2 \u0433\u0438\u0441") || dataset.includes("2gis")) {
+    return "2gis";
+  }
+  if (source.includes("yandex") || source.includes("\u044f\u043d\u0434\u0435\u043a\u0441") || dataset.includes("yandex")) {
+    return "yandex";
+  }
+  if (source.includes("ostrovok") || dataset.includes("ostrovok")) {
+    return "ostrovok";
+  }
+
+  return "manual_upload";
 }
 
 function extractCity(address) {
