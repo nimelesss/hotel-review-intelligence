@@ -1,10 +1,10 @@
 export const APP_NAME = "Hotel Review Intelligence";
-export const ANALYSIS_VERSION = "mvp-1.1.0";
-export const DEFAULT_HOTEL_ID = "hotel-2921114554"; // Солнечный, Солнечногорск (95 отзывов)
+export const ANALYSIS_VERSION = "mvp-1.1.2";
+export const DEFAULT_HOTEL_ID = "hotel-2921114554"; // \u0421\u043e\u043b\u043d\u0435\u0447\u043d\u044b\u0439, \u0421\u043e\u043b\u043d\u0435\u0447\u043d\u043e\u0433\u043e\u0440\u0441\u043a (95 \u043e\u0442\u0437\u044b\u0432\u043e\u0432)
 
 export const UI_TEXT = {
   productTagline:
-    "Платформа управленческой аналитики отзывов для гостиничного бизнеса",
+    "\u041f\u043b\u0430\u0442\u0444\u043e\u0440\u043c\u0430 \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0447\u0435\u0441\u043a\u043e\u0439 \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0438 \u043e\u0442\u0437\u044b\u0432\u043e\u0432 \u0434\u043b\u044f \u0433\u043e\u0441\u0442\u0438\u043d\u0438\u0447\u043d\u043e\u0433\u043e \u0431\u0438\u0437\u043d\u0435\u0441\u0430",
   executiveHint:
-    "Факты -> вероятностные выводы -> управленческие решения. Без black-box обещаний."
+    "\u0424\u0430\u043a\u0442\u044b -> \u0432\u0435\u0440\u043e\u044f\u0442\u043d\u043e\u0441\u0442\u043d\u044b\u0435 \u0432\u044b\u0432\u043e\u0434\u044b -> \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0447\u0435\u0441\u043a\u0438\u0435 \u0440\u0435\u0448\u0435\u043d\u0438\u044f. \u0411\u0435\u0437 black-box \u043e\u0431\u0435\u0449\u0430\u043d\u0438\u0439."
 };

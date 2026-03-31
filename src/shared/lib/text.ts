@@ -13,7 +13,12 @@ export function decodeEscapedUnicode(input: string): string {
 }
 
 export function normalizeWhitespace(input: string): string {
-  return input.replace(/\s+/g, " ").trim();
+  return input
+    .replace(/\\[nrt]/g, " ")
+    .replace(/[\?\uFFFD]{3,}/g, " ")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function toLowerSafe(input: string): string {

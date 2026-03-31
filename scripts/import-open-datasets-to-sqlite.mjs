@@ -21,14 +21,14 @@ const MAX_ROWS_PER_SOURCE = Number(process.env.OPEN_DATASET_MAX_ROWS_PER_SOURCE 
 const SOURCE_TIMEOUT_MS = Number(process.env.OPEN_DATASET_SOURCE_TIMEOUT_MS || 0);
 
 const ACCOMMODATION_MARKERS = [
-  "гостиниц",
-  "отель",
-  "хостел",
-  "апарт",
-  "апартаменты",
-  "гостевой дом",
-  "санатор",
-  "база отдыха",
+  "\u0433\u043e\u0441\u0442\u0438\u043d\u0438\u0446",
+  "\u043e\u0442\u0435\u043b\u044c",
+  "\u0445\u043e\u0441\u0442\u0435\u043b",
+  "\u0430\u043f\u0430\u0440\u0442",
+  "\u0430\u043f\u0430\u0440\u0442\u0430\u043c\u0435\u043d\u0442\u044b",
+  "\u0433\u043e\u0441\u0442\u0435\u0432\u043e\u0439 \u0434\u043e\u043c",
+  "\u0441\u0430\u043d\u0430\u0442\u043e\u0440",
+  "\u0431\u0430\u0437\u0430 \u043e\u0442\u0434\u044b\u0445\u0430",
   "hotel",
   "hostel",
   "resort",
@@ -586,7 +586,12 @@ function normalizeForKey(value) {
 }
 
 function normalizeWhitespace(value) {
-  return String(value || "").replace(/\s+/g, " ").trim();
+  return String(value || "")
+    .replace(/\\[nrt]/g, " ")
+    .replace(/[\?\uFFFD]{3,}/g, " ")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function isRegionPart(value) {

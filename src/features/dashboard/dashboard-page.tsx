@@ -912,27 +912,38 @@ function scoreExistingHotel(hotel: Hotel, candidate: HotelSearchResult): number 
   let score = 0;
   const candidateExternal = normalizeKey(candidate.externalId || "");
   const hotelExternal = normalizeKey(hotel.externalId || "");
+  let hasAnchorMatch = false;
 
   if (candidateExternal) {
     if (normalizeKey(hotel.id) === candidateExternal) {
       score += 700;
+      hasAnchorMatch = true;
     }
     if (hotelExternal && hotelExternal === candidateExternal) {
       score += 640;
+      hasAnchorMatch = true;
     }
   }
 
   const hotelKeys = buildHotelMatchKeys(hotel.name, hotel.city);
   const candidateKeys = buildHotelMatchKeys(candidate.name, candidate.city);
   const sharedKeys = [...candidateKeys].filter((key) => hotelKeys.has(key));
-  score += sharedKeys.length * 140;
-
-  if (normalizeKey(hotel.city) === normalizeKey(candidate.city)) {
-    score += 50;
+  if (sharedKeys.length > 0) {
+    hasAnchorMatch = true;
   }
+  score += sharedKeys.length * 140;
 
   if (normalizeKey(hotel.address) === normalizeKey(candidate.address || "")) {
     score += 80;
+    hasAnchorMatch = true;
+  }
+
+  if (!hasAnchorMatch) {
+    return 0;
+  }
+
+  if (normalizeKey(hotel.city) === normalizeKey(candidate.city)) {
+    score += 50;
   }
 
   if ((hotel.reviewCount ?? 0) > 0) {

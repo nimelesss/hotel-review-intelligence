@@ -18,7 +18,11 @@ import {
   IntelligenceRepository,
   RepositorySnapshot
 } from "@/server/repositories/types";
-import { normalizeSearchText, normalizeWhitespace } from "@/shared/lib/text";
+import {
+  decodeEscapedUnicode,
+  normalizeSearchText,
+  normalizeWhitespace
+} from "@/shared/lib/text";
 
 export class SqliteIntelligenceRepository implements IntelligenceRepository {
   private readonly db = getSqliteDb();
@@ -1147,8 +1151,8 @@ function mapReviewRow(row: DbReviewRow): Review {
     reviewDate: row.review_date,
     rating: Number(row.rating),
     title: row.title || undefined,
-    text: row.text,
-    cleanedText: row.cleaned_text,
+    text: normalizeReviewText(row.text),
+    cleanedText: normalizeReviewText(row.cleaned_text),
     language: row.language,
     authorName: row.author_name || undefined,
     stayTypeRaw: row.stay_type_raw || undefined,
@@ -1268,8 +1272,8 @@ function mapReviewWithAnalysisRowToReview(row: DbReviewWithAnalysisRow): Review 
     reviewDate: row.review_date,
     rating: Number(row.review_rating),
     title: row.review_title || undefined,
-    text: row.review_text,
-    cleanedText: row.review_cleaned_text,
+    text: normalizeReviewText(row.review_text),
+    cleanedText: normalizeReviewText(row.review_cleaned_text),
     language: row.review_language,
     authorName: row.review_author_name || undefined,
     stayTypeRaw: row.review_stay_type_raw || undefined,
@@ -1450,6 +1454,10 @@ function slugify(value: string): string {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeReviewText(text: string): string {
+  return normalizeWhitespace(decodeEscapedUnicode(text || ""));
 }
 
 function makeTextHash(text: string): string {

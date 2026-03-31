@@ -1,13 +1,20 @@
 import { TopicSentiment } from "@/entities/types";
 
-const HIGH_RISK_KEYWORDS = ["гряз", "хамств", "скандал", "небезопас", "обман", "неработ"];
+const HIGH_RISK_KEYWORDS = [
+  { marker: "гряз", label: "грязь или некачественная уборка" },
+  { marker: "хамств", label: "хамство персонала" },
+  { marker: "скандал", label: "конфликтная ситуация" },
+  { marker: "небезопас", label: "ощущение небезопасности" },
+  { marker: "обман", label: "подозрение на обман" },
+  { marker: "неработ", label: "неработающий сервис или оборудование" }
+];
 
 export function detectRiskFlags(loweredText: string, topics: TopicSentiment[]): string[] {
   const flags: string[] = [];
 
   HIGH_RISK_KEYWORDS.forEach((keyword) => {
-    if (loweredText.includes(keyword)) {
-      flags.push(`Критичный маркер: ${keyword}`);
+    if (loweredText.includes(keyword.marker)) {
+      flags.push(`Критичный маркер: ${keyword.label}`);
     }
   });
 

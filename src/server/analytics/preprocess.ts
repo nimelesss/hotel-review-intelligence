@@ -17,7 +17,7 @@ const SERVICE_NOISE_PATTERNS = [
   /_+/g
 ];
 
-const FILLER_PATTERNS = [/[\u200B-\u200D\uFEFF]/g, /[\r\n\t]+/g];
+const FILLER_PATTERNS = [/[\u200B-\u200D\uFEFF]/g, /\\[nrt]/g, /[\r\n\t]+/g];
 
 export function preprocessReviewText(text: string): PreprocessResult {
   const originalText = text ?? "";

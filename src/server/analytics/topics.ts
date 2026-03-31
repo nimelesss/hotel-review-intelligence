@@ -21,8 +21,8 @@ export function detectTopics(input: TopicSignalInput): TopicDetectionResult {
   const topics: TopicSentiment[] = [];
 
   TOPICS.forEach((topic) => {
-    const matchedKeywords = topic.markers.filter((marker) =>
-      hasMarker(markerSet, marker)
+    const matchedKeywords = topic.markers.flatMap((marker) =>
+      findMatchedKeywords(markerSet, marker)
     );
     if (!matchedKeywords.length) {
       return;
@@ -53,6 +53,18 @@ function hasMarker(markerSet: Set<string>, marker: string): boolean {
   return fragments.every((fragment) =>
     [...markerSet].some((value) => value.includes(fragment))
   );
+}
+
+function findMatchedKeywords(markerSet: Set<string>, marker: string): string[] {
+  const directMatches = [...markerSet].filter((value) => {
+    if (value === marker) {
+      return true;
+    }
+    const fragments = marker.split(" ");
+    return fragments.every((fragment) => value.includes(fragment));
+  });
+
+  return [...new Set(directMatches)].slice(0, 3);
 }
 
 function toSentimentLabel(score: number): SentimentLabel {
