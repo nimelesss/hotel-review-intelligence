@@ -14,7 +14,6 @@ import { formatDate, formatPercent, formatRating } from "@/shared/lib/format";
 import { fetchJson } from "@/shared/lib/http";
 import { riskVariant, sentimentVariant } from "@/shared/lib/presentation";
 import { stripAccommodationWords } from "@/shared/lib/text";
-import { AnalysisProgress } from "@/shared/ui/analysis-progress";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardTitle } from "@/shared/ui/card";
@@ -69,7 +68,7 @@ export function DashboardPage() {
   useEffect(() => {
     const loadHotels = async () => {
       try {
-        const response = await fetchJson<HotelListResponse>("/api/hotels");
+        const response = await fetchJson<HotelListResponse>("/api/hotels?limit=60");
         setHotels(response.items);
         setSelectedHotelId((prev) => {
           const prevExists = response.items.some((hotel) => hotel.id === prev);
@@ -120,12 +119,26 @@ export function DashboardPage() {
       }
     };
     void loadDashboard();
-  }, [selectedHotelId, reloadKey, hotels]);
+  }, [selectedHotelId, reloadKey]);
 
   const selectedHotel = useMemo(
-    () => hotels.find((hotel) => hotel.id === selectedHotelId),
-    [hotels, selectedHotelId]
+    () => hotels.find((hotel) => hotel.id === selectedHotelId) || dashboard?.hotel || undefined,
+    [dashboard?.hotel, hotels, selectedHotelId]
   );
+
+  useEffect(() => {
+    if (!dashboard?.hotel) {
+      return;
+    }
+
+    setHotels((prev) => {
+      if (prev.some((hotel) => hotel.id === dashboard.hotel.id)) {
+        return prev;
+      }
+
+      return [dashboard.hotel, ...prev].slice(0, 60);
+    });
+  }, [dashboard?.hotel]);
 
   const onSearchInputChange = useCallback(
     (value: string) => {
@@ -263,6 +276,19 @@ export function DashboardPage() {
     }
   };
 
+  const focusSearchHero = useCallback(() => {
+    document.getElementById("hotel-search-hero")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+
+    window.setTimeout(() => {
+      const input = document.getElementById("hotel-search-input") as HTMLInputElement | null;
+      input?.focus();
+      input?.select();
+    }, 180);
+  }, []);
+
   const onCreateHotelFromSearch = async (candidate: HotelSearchResult) => {
     setSyncBusy(true);
     setSearchError(null);
@@ -274,6 +300,19 @@ export function DashboardPage() {
         const nextQuery = `${existing.name}, ${existing.city}`;
         setSelectedHotelId(existing.id);
         setSyncMessage(`Открыт существующий профиль: ${existing.name}.`);
+        setSearchResults([]);
+        setShowSearchResults(false);
+        setSearchLockQuery(nextQuery);
+        setSearchQuery(nextQuery);
+        setPendingScrollToStats(true);
+        return;
+      }
+
+      if (candidate.externalId?.startsWith("hotel-")) {
+        const repositoryHotelId = candidate.externalId;
+        const nextQuery = `${candidate.name}, ${candidate.city}`;
+        setSelectedHotelId(repositoryHotelId);
+        setSyncMessage(`Открыт существующий профиль: ${candidate.name}.`);
         setSearchResults([]);
         setShowSearchResults(false);
         setSearchLockQuery(nextQuery);
@@ -439,17 +478,16 @@ export function DashboardPage() {
         subtitle={`${hotel.name}. ${UI_TEXT.productTagline}`}
         rightSlot={
           <>
-            <select
-              className="rounded-lg border border-border bg-panel px-3 py-2 text-sm text-text"
-              value={selectedHotelId}
-              onChange={(event) => setSelectedHotelId(event.target.value)}
-            >
-              {hotels.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
+            <div className="min-w-[220px] rounded-lg border border-border bg-panelMuted px-3 py-2">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-textMuted">
+                Текущий отель
+              </p>
+              <p className="mt-1 text-sm font-semibold text-text">{hotel.name}</p>
+              <p className="text-xs text-textMuted">{hotel.city}</p>
+            </div>
+            <Button variant="secondary" onClick={focusSearchHero}>
+              Сменить отель
+            </Button>
             <Button
               variant="secondary"
               onClick={() => {
@@ -470,8 +508,6 @@ export function DashboardPage() {
       />
 
       {syncMessage ? <Badge variant="success">{syncMessage}</Badge> : null}
-
-      <AnalysisProgress run={latestRun} />
 
       {aggregate.totalReviews === 0 ? (
         <Card>
@@ -770,7 +806,8 @@ function SearchHero(props: {
   } = props;
 
   return (
-    <Card className="search-hero-card relative overflow-hidden border-border">
+    <div id="hotel-search-hero">
+      <Card className="search-hero-card relative overflow-hidden border-border">
       <div className="search-hero-orb pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-cyan-200/55 blur-2xl" />
       <div className="search-hero-orb pointer-events-none absolute -bottom-12 -right-10 h-48 w-48 rounded-full bg-blue-200/45 blur-2xl" />
       <CardTitle
@@ -779,6 +816,7 @@ function SearchHero(props: {
       />
       <div className="grid gap-3 md:grid-cols-[1fr_auto]">
         <Input
+          id="hotel-search-input"
           value={searchQuery}
           placeholder="Например: Courtyard by Marriott Ростов-на-Дону"
           onChange={(event) => setSearchQuery(event.target.value)}
@@ -835,7 +873,8 @@ function SearchHero(props: {
           ))}
         </div>
       ) : null}
-    </Card>
+      </Card>
+    </div>
   );
 }
 

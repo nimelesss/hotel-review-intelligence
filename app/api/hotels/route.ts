@@ -1,14 +1,26 @@
 import { NextResponse } from "next/server";
 import { CreateHotelRequest } from "@/entities/types";
 import { getRepository } from "@/server/repositories";
+import { isSearchableHotelName } from "@/server/search/hotel-catalog-filter";
 import { createHotel } from "@/server/services/intelligence.service";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const limit = clampLimit(searchParams.get("limit"));
   const repository = getRepository();
-  const hotels = repository.listHotels();
+  const hotels = repository
+    .listHotels()
+    .filter((hotel) => isSearchableHotelName(hotel.name))
+    .sort((a, b) => {
+      const reviewDelta = (b.reviewCount ?? 0) - (a.reviewCount ?? 0);
+      if (reviewDelta !== 0) {
+        return reviewDelta;
+      }
+      return (b.latestReviewDate || "").localeCompare(a.latestReviewDate || "");
+    });
   const reviewedHotels = hotels.filter((hotel) => (hotel.reviewCount ?? 0) > 0);
   return NextResponse.json({
-    items: reviewedHotels.length ? reviewedHotels : hotels
+    items: (reviewedHotels.length ? reviewedHotels : hotels).slice(0, limit)
   });
 }
 
@@ -34,4 +46,13 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+}
+
+function clampLimit(value: string | null): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return 60;
+  }
+
+  return Math.min(200, Math.max(10, Math.floor(parsed)));
 }

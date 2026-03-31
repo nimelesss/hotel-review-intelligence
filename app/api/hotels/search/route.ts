@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { HotelSearchResult } from "@/entities/types";
 import { getRepository } from "@/server/repositories";
+import { isSearchableHotelName } from "@/server/search/hotel-catalog-filter";
 import {
   hydrateHotelCatalogFromRemoteSource,
   searchHotelCatalog
@@ -28,6 +29,10 @@ export async function GET(request: Request) {
     );
   }
 
+  if (!isSearchableHotelName(query)) {
+    return NextResponse.json({ items: [] });
+  }
+
   const queryVariants = buildQueryVariants(query);
   const lookupLimit = Math.max(limit * 4, 40);
 
@@ -51,6 +56,7 @@ export async function GET(request: Request) {
   }
 
   const items = entries
+    .filter((entry) => isSearchableHotelName(entry.item.name))
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
@@ -91,7 +97,7 @@ function getRepositoryIndex(): IndexedRepositoryHotel[] {
   }
 
   const repository = getRepository();
-  const hotels = repository.listHotels();
+  const hotels = repository.listHotels().filter((hotel) => isSearchableHotelName(hotel.name));
 
   repositoryIndexCache = hotels.map((hotel) => {
     const item: HotelSearchResult = {
