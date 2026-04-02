@@ -26,7 +26,7 @@ export function SegmentDistributionChart({
   }
 
   return (
-    <div className="relative h-80 w-full overflow-hidden rounded-[1.35rem] border border-border bg-[radial-gradient(circle_at_50%_28%,rgba(14,165,233,0.16),transparent_42%),radial-gradient(circle_at_78%_72%,rgba(236,72,153,0.12),transparent_30%)] px-2 pt-3">
+    <div className="segment-chart-shell relative h-80 w-full overflow-hidden rounded-[1.35rem] border border-border bg-[radial-gradient(circle_at_50%_28%,rgba(14,165,233,0.16),transparent_42%),radial-gradient(circle_at_78%_72%,rgba(236,72,153,0.12),transparent_30%)] px-2 pt-3">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
@@ -36,6 +36,10 @@ export function SegmentDistributionChart({
             innerRadius={58}
             outerRadius={102}
             paddingAngle={4}
+            isAnimationActive
+            animationBegin={140}
+            animationDuration={920}
+            animationEasing="ease-out"
           >
             {filtered.map((entry, index) => (
               <Cell

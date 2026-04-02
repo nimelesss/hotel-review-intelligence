@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AnalysisRun,
   DashboardPayload,
   Hotel,
   HotelSearchResult,
@@ -10,7 +9,7 @@ import {
 } from "@/entities/types";
 import { APP_NAME, UI_TEXT } from "@/shared/config/constants";
 import { SENTIMENT_LABELS, SEGMENT_LABELS, TOPIC_LABELS } from "@/shared/config/taxonomy";
-import { formatDate, formatPercent, formatRating } from "@/shared/lib/format";
+import { formatPercent, formatRating } from "@/shared/lib/format";
 import { fetchJson } from "@/shared/lib/http";
 import { riskVariant, sentimentVariant } from "@/shared/lib/presentation";
 import { stripAccommodationWords } from "@/shared/lib/text";
@@ -365,7 +364,7 @@ export function DashboardPage() {
     return <ErrorState title="Данные по отелю недоступны" description="Выберите отель или добавьте его через поиск." />;
   }
 
-  const { hotel, aggregate, executiveSummary, latestRun } = dashboard;
+  const { hotel, aggregate, executiveSummary } = dashboard;
   const sampleReviews = dashboard.sampleExplainedReviews.slice(0, 3);
   const previewRecommendations = dashboard.recommendationsPreview.slice(0, 4);
   const topRisks = aggregate.topicDistribution
@@ -394,12 +393,6 @@ export function DashboardPage() {
         subtitle={`${hotel.city}, ${hotel.country}. ${UI_TEXT.productTagline}.`}
         rightSlot={
           <>
-            {latestRun ? (
-              <Badge variant={latestRun.status === "completed" ? "success" : latestRun.status === "failed" ? "danger" : "warning"}>
-                {translateRunStatus(latestRun.status)}
-              </Badge>
-            ) : null}
-            <Badge variant="default">Обновлено {formatDate(aggregate.updatedAt)}</Badge>
             <Button variant="secondary" onClick={focusSearchHero}>Сменить отель</Button>
           </>
         }
@@ -711,19 +704,6 @@ function translatePriority(priority: string): string {
     high: "Высокий"
   };
   return map[priority] || priority;
-}
-
-function translateRunStatus(status: AnalysisRun["status"]): string {
-  if (status === "completed") {
-    return "Сводка актуальна";
-  }
-  if (status === "failed") {
-    return "Нужна проверка";
-  }
-  if (status === "running") {
-    return "Данные обновляются";
-  }
-  return "Ожидает запуска";
 }
 
 function normalizeKey(value: string): string {
