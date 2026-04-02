@@ -17,13 +17,23 @@ const SERVICE_NOISE_PATTERNS = [
   /_+/g
 ];
 
-const FILLER_PATTERNS = [/[\u200B-\u200D\uFEFF]/g, /\\[nrt]/g, /[\r\n\t]+/g];
+const OCR_NOISE_PATTERNS = [
+  /[\?\uFFFD]{2,}/g,
+  /[©®™]+/g,
+  /^ЖЖ\s+\d+\s+(?:дне[йя]|недел[ьи]|месяц\w*|час\w*|минут\w*)\s+назад\s*/i,
+  /\.{4,}/g
+];
+
+const FILLER_PATTERNS = [/[\u200B-\u200D\uFEFF\u00AD]/g, /\\[nrt]/g, /[\r\n\t]+/g];
 
 export function preprocessReviewText(text: string): PreprocessResult {
   const originalText = text ?? "";
   let cleaned = originalText;
 
   for (const pattern of SERVICE_NOISE_PATTERNS) {
+    cleaned = cleaned.replace(pattern, " ");
+  }
+  for (const pattern of OCR_NOISE_PATTERNS) {
     cleaned = cleaned.replace(pattern, " ");
   }
   for (const pattern of FILLER_PATTERNS) {

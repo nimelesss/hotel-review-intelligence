@@ -546,9 +546,19 @@ function extractCity(address) {
   return normalizeCityLabel(cityCandidate || first);
 }
 
+function cleanOcrArtifacts(text) {
+  return text
+    .replace(/[\?\uFFFD]{2,}/g, " ")
+    .replace(/[©®™]+/g, " ")
+    .replace(/^ЖЖ\s+\d+\s+(дне[йя]|недел[ьи]|месяц\w*|час\w*|минут\w*)\s+назад\s*/i, "")
+    .replace(/&[a-z]+;/gi, " ")
+    .replace(/[\u200B-\u200D\uFEFF\u00AD]/g, "")
+    .replace(/\.{4,}/g, "...");
+}
+
 function cleanText(text) {
   return normalizeWhitespace(
-    text
+    cleanOcrArtifacts(text)
       .toLowerCase()
       .replace(/\s+/g, " ")
       .trim()
