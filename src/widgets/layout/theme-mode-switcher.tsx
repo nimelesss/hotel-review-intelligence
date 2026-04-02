@@ -7,10 +7,10 @@ type ThemeMode = "light" | "dark" | "system";
 
 const STORAGE_KEY = "hri-theme-mode";
 
-const OPTIONS: Array<{ mode: ThemeMode; label: string; shortLabel: string }> = [
-  { mode: "light", label: "Светлая", shortLabel: "Свет" },
-  { mode: "dark", label: "Темная", shortLabel: "Ночь" },
-  { mode: "system", label: "Системная", shortLabel: "Система" }
+const OPTIONS: Array<{ mode: ThemeMode; label: string }> = [
+  { mode: "light", label: "Светлая" },
+  { mode: "dark", label: "Темная" },
+  { mode: "system", label: "Системная" }
 ];
 
 function readMode(): ThemeMode {
@@ -79,7 +79,7 @@ export function ThemeModeSwitcher({ compact = false }: { compact?: boolean }) {
 
   if (compact) {
     return (
-      <div className="theme-switcher flex rounded-full border border-border bg-panelMuted p-1 shadow-soft">
+      <div className="theme-switcher flex min-w-[15.5rem] max-w-full rounded-full border border-border bg-panelMuted p-1 shadow-soft">
         {OPTIONS.map((option) => {
           const active = option.mode === mode;
           return (
@@ -87,14 +87,14 @@ export function ThemeModeSwitcher({ compact = false }: { compact?: boolean }) {
               key={option.mode}
               type="button"
               className={cn(
-                "rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all duration-200",
+                "min-w-0 flex-1 truncate rounded-full px-3 py-2 text-[11px] font-semibold tracking-[-0.01em] transition-all duration-200",
                 active ? "bg-panelSolid text-text shadow-soft" : "text-textMuted hover:text-text"
               )}
               data-active={active}
               onClick={() => setThemeMode(option.mode)}
               aria-label={option.label}
             >
-              {option.shortLabel}
+              {option.label}
             </button>
           );
         })}

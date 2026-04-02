@@ -36,14 +36,6 @@ interface CreateHotelResponse {
   item: Hotel;
 }
 
-interface RealtimeSyncResponse {
-  result: {
-    targetsStarted: number;
-    runs: AnalysisRun[];
-    warnings: string[];
-  };
-}
-
 const SEARCH_DEBOUNCE_MS = 360;
 
 export function DashboardPage() {
@@ -335,50 +327,6 @@ export function DashboardPage() {
     }
   };
 
-  const onRunRealtimeSync = async () => {
-    if (!selectedHotelId) {
-      return;
-    }
-    const effectiveHotel = resolveSyncHotelSelection(selectedHotelId, hotels);
-    if (!effectiveHotel) {
-      setSearchError("Выбранный отель не найден. Обновите список отелей и попробуйте снова.");
-      return;
-    }
-
-    setSyncBusy(true);
-    setSyncMessage(null);
-    setSearchError(null);
-    try {
-      if (effectiveHotel.id !== selectedHotelId) {
-        setSelectedHotelId(effectiveHotel.id);
-        setSyncMessage(`Для анализа выбран профиль с отзывами: ${effectiveHotel.name}.`);
-      }
-      const response = await fetchJson<RealtimeSyncResponse>("/api/sync/realtime-hotel", {
-        method: "POST",
-        body: JSON.stringify({ hotelId: effectiveHotel.id })
-      });
-      const warningsCount = response.result.warnings.length;
-      if (response.result.targetsStarted > 0) {
-        setSyncMessage(
-          warningsCount > 0
-            ? `Запущено источников: ${response.result.targetsStarted}. Предупреждений: ${warningsCount}.`
-            : `Запущено источников: ${response.result.targetsStarted}.`
-        );
-      } else {
-        setSyncMessage(
-          warningsCount > 0
-            ? `Сбор не стартовал. Предупреждений: ${warningsCount}.`
-            : "Сбор не стартовал: для выбранного отеля нет доступных источников."
-        );
-      }
-      setReloadKey((prev) => prev + 1);
-    } catch (err) {
-      setSearchError(err instanceof Error ? err.message : "Не удалось запустить сбор отзывов по площадкам.");
-    } finally {
-      setSyncBusy(false);
-    }
-  };
-
   if (loading && !dashboard && selectedHotelId) {
     return (
       <div className="space-y-4">
@@ -453,15 +401,19 @@ export function DashboardPage() {
             ) : null}
             <Badge variant="default">Обновлено {formatDate(aggregate.updatedAt)}</Badge>
             <Button variant="secondary" onClick={focusSearchHero}>Сменить отель</Button>
-            <Button variant="secondary" onClick={() => setReloadKey((prev) => prev + 1)}>Обновить сводку</Button>
-            <Button onClick={onRunRealtimeSync} disabled={syncBusy} className="animate-fadePulse">
-              {syncBusy ? "Запускаем сбор..." : "Собрать отзывы"}
-            </Button>
           </>
         }
       />
 
       {syncMessage ? <Badge variant="success">{syncMessage}</Badge> : null}
+
+      {aggregate.totalReviews > 0 ? (
+        <Card className="xl:hidden">
+          <CardTitle kicker="Структура аудитории" title="Структура аудитории" subtitle="Вероятностное распределение сегментов и их вклад в текущую картину спроса." />
+          <SegmentDistributionChart data={aggregate.segmentDistribution} />
+          <p className="mt-3 text-sm leading-6 text-textMuted">Сегментация носит вероятностный характер и используется как управленческая интерпретация отзывов, а не как персональный профиль гостя.</p>
+        </Card>
+      ) : null}
 
       {aggregate.totalReviews === 0 ? (
         <Card>
@@ -473,12 +425,10 @@ export function DashboardPage() {
           <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
             <div className="rounded-[1.2rem] border border-border bg-panelMuted p-4">
               <p className="text-sm leading-7 text-textMuted">
-                Чтобы заполнить сводку, запустите сбор по площадкам. Если после запуска данные не появились,
-                проверьте серверные переменные <code>DEFAULT_REALTIME_TARGETS_JSON</code>, <code>PORTFOLIO_SYNC_TARGETS_JSON</code> и доступность dataset URL источников.
+                Для этого объекта в текущем контуре еще не подключен корпус отзывов. Вы можете выбрать другой профиль в каталоге или вернуться к этому отелю позже, когда данные будут подготовлены.
               </p>
             </div>
             <div className="flex flex-col gap-3">
-              <Button onClick={onRunRealtimeSync} disabled={syncBusy} size="lg">Собрать отзывы сейчас</Button>
               <Button variant="secondary" onClick={focusSearchHero} size="lg">Выбрать другой отель</Button>
             </div>
           </div>
@@ -520,7 +470,7 @@ export function DashboardPage() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card>
+        <Card className="hidden xl:block">
           <CardTitle kicker="Структура аудитории" title="Структура аудитории" subtitle="Вероятностное распределение сегментов и их вклад в текущую картину спроса." />
           <SegmentDistributionChart data={aggregate.segmentDistribution} />
           <p className="mt-3 text-sm leading-6 text-textMuted">Сегментация носит вероятностный характер и используется как управленческая интерпретация отзывов, а не как персональный профиль гостя.</p>
@@ -786,29 +736,6 @@ function findBestExistingHotel(hotels: Hotel[], candidate: HotelSearchResult): H
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score)
     .map((entry) => entry.hotel)[0];
-}
-
-function resolveSyncHotelSelection(selectedHotelId: string, hotels: Hotel[]): Hotel | undefined {
-  const selected = hotels.find((hotel) => hotel.id === selectedHotelId);
-  if (!selected) {
-    return undefined;
-  }
-  if ((selected.reviewCount ?? 0) > 0) {
-    return selected;
-  }
-
-  const candidate: HotelSearchResult = {
-    externalId: selected.externalId || selected.id,
-    name: selected.name,
-    city: selected.city,
-    country: selected.country,
-    address: selected.address,
-    coordinates: selected.coordinates,
-    source: "catalog_import"
-  };
-
-  const reviewedHotels = hotels.filter((hotel) => hotel.id !== selected.id && (hotel.reviewCount ?? 0) > 0);
-  return findBestExistingHotel(reviewedHotels, candidate) || selected;
 }
 
 function scoreExistingHotel(hotel: Hotel, candidate: HotelSearchResult): number {
