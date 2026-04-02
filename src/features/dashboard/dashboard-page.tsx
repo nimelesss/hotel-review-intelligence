@@ -684,12 +684,12 @@ function SearchHero(props: {
         <div className="grid gap-0 xl:grid-cols-[1.15fr_0.85fr]">
           <div className="relative px-5 py-6 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
             <Badge variant="info">{APP_NAME}</Badge>
-            <h2 className="mt-5 max-w-3xl text-3xl font-semibold leading-[1.02] text-text sm:text-[2.8rem]">Найдите отель и откройте готовую управленческую аналитику за минуты, а не после ручного чтения сотен отзывов.</h2>
+            <h2 className="mt-5 max-w-xl text-3xl font-semibold leading-[1.05] text-text sm:text-[2.6rem]">Сотни отзывов — одна сводка.</h2>
+            <p className="mt-3 text-base text-textMuted">Найдите отель и получите готовую аналитику по сегментам, темам и рискам.</p>
             <div className="mt-6 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
               <Input id="hotel-search-input" value={searchQuery} className="min-h-14 bg-panelSolid text-base" placeholder="Например: Courtyard by Marriott Ростов-на-Дону" onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void onSearchHotels(); } }} />
               <Button onClick={() => { void onSearchHotels(); }} disabled={searching} size="lg" className={searching ? "animate-pulse" : ""}>{searching ? "Ищем отели..." : "Найти отель"}</Button>
             </div>
-            <p className="mt-4 text-xs tracking-[0.04em] text-textMuted">Подсказки появляются автоматически при вводе 2+ символов.</p>
             {searchError ? <p className="mt-3 text-sm leading-6 text-danger">{searchError}</p> : null}
           </div>
           <div className="hidden border-l border-border xl:block">
