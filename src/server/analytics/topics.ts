@@ -16,6 +16,15 @@ export interface TopicDetectionResult {
   topics: TopicSentiment[];
 }
 
+/**
+ * Minimum confidence: lowered from 0.45 to 0.15.
+ * Single keyword match = 0.25 confidence (was 0.45 — too high).
+ * 3+ keywords = 0.85+ confidence.
+ */
+const CONFIDENCE_BASE = 0.15;
+const CONFIDENCE_SLOPE = 0.25;
+const CONFIDENCE_MAX = 0.95;
+
 export function detectTopics(input: TopicSignalInput): TopicDetectionResult {
   const markerSet = new Set(input.markers);
   const topics: TopicSentiment[] = [];
@@ -28,13 +37,19 @@ export function detectTopics(input: TopicSignalInput): TopicDetectionResult {
       return;
     }
 
-    const mentionStrength = clamp(matchedKeywords.length / 3, 0.2, 1);
+    const mentionStrength = clamp(matchedKeywords.length / 3, 0.1, 1);
     const topicScore = clamp(input.sentimentScore * mentionStrength, -1, 1);
+    const confidence = clamp(
+      CONFIDENCE_BASE + matchedKeywords.length * CONFIDENCE_SLOPE,
+      CONFIDENCE_BASE,
+      CONFIDENCE_MAX
+    );
+
     topics.push({
       topic: topic.id,
       sentimentLabel: toSentimentLabel(topicScore),
       sentimentScore: topicScore,
-      confidence: clamp(0.45 + mentionStrength * 0.45, 0.45, 0.95),
+      confidence,
       matchedKeywords
     });
   });
@@ -43,16 +58,6 @@ export function detectTopics(input: TopicSignalInput): TopicDetectionResult {
     topicIds: topics.map((topic) => topic.topic),
     topics
   };
-}
-
-function hasMarker(markerSet: Set<string>, marker: string): boolean {
-  if (markerSet.has(marker)) {
-    return true;
-  }
-  const fragments = marker.split(" ");
-  return fragments.every((fragment) =>
-    [...markerSet].some((value) => value.includes(fragment))
-  );
 }
 
 function findMatchedKeywords(markerSet: Set<string>, marker: string): string[] {
@@ -68,10 +73,10 @@ function findMatchedKeywords(markerSet: Set<string>, marker: string): string[] {
 }
 
 function toSentimentLabel(score: number): SentimentLabel {
-  if (score > 0.2) {
+  if (score > 0.15) {
     return "positive";
   }
-  if (score < -0.2) {
+  if (score < -0.15) {
     return "negative";
   }
   return "neutral";
