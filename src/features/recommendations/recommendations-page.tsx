@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { Hotel, RecommendationPayload } from "@/entities/types";
@@ -80,8 +80,10 @@ export function RecommendationsPage() {
         <PageHeader
           title="Рекомендации"
           subtitle="Приоритизированные действия с прозрачным бизнес-обоснованием."
+          badge="Действия"
           rightSlot={
             <Select
+              className="min-w-[250px]"
               value={selectedHotelId}
               onChange={(event) => setSelectedHotelId(event.target.value)}
             >
@@ -107,8 +109,9 @@ export function RecommendationsPage() {
       <PageHeader
         title="Рекомендации"
         subtitle="Приоритизированные действия с прозрачным бизнес-обоснованием."
+        badge="Действия"
         rightSlot={
-          <Select value={selectedHotelId} onChange={(event) => setSelectedHotelId(event.target.value)}>
+          <Select className="min-w-[250px]" value={selectedHotelId} onChange={(event) => setSelectedHotelId(event.target.value)}>
             <option value="">Выберите отель</option>
             {hotels.map((hotel) => (
               <option key={hotel.id} value={hotel.id}>
@@ -123,9 +126,8 @@ export function RecommendationsPage() {
         {payload.recommendations.length ? (
           payload.recommendations.map((recommendation) => (
             <Card key={recommendation.id}>
-              <CardTitle title={recommendation.title} subtitle={recommendation.description} />
+              <CardTitle kicker={translateCategory(recommendation.category)} title={recommendation.title} subtitle={recommendation.description} />
               <div className="flex flex-wrap gap-2">
-                <Badge variant="info">{translateCategory(recommendation.category)}</Badge>
                 <Badge variant={priorityVariant(recommendation.priority)}>
                   {translatePriority(recommendation.priority)}
                 </Badge>
@@ -174,3 +176,4 @@ function translatePriority(priority: string): string {
   };
   return map[priority] || priority;
 }
+

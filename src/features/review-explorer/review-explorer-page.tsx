@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -132,14 +132,16 @@ export function ReviewExplorerPage() {
     <div className="space-y-6">
       <PageHeader
         title="Отзывы"
-        subtitle="Фильтрация, поиск и объяснимый разбор каждого отзыва."
+        subtitle="Фильтрация, поиск и объяснимый разбор каждого отзыва с переходом от текста к управленческому сигналу."
         badge="Анализ отзывов"
+        rightSlot={result ? <Badge variant="default">{result.total} отзывов в выборке</Badge> : undefined}
       />
 
       <Card>
         <CardTitle
-          title="Фильтры"
-          subtitle="Тональность, сегмент, тема, источник, оценка, период и текстовый поиск."
+          kicker="Фильтры"
+          title="Настройка выборки"
+          subtitle="Сузьте корпус отзывов по тональности, сегменту, теме, источнику, периоду и текстовым признакам."
         />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Select
@@ -267,13 +269,14 @@ export function ReviewExplorerPage() {
             }
           />
         </div>
-        <div className="mt-3 flex gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Badge variant="info">Сценарий просмотра</Badge>
           <button
             type="button"
-            className={`rounded-lg border px-3 py-1.5 text-xs ${
+            className={`rounded-full border px-4 py-2 text-xs font-semibold transition-all ${
               viewMode === "table"
-                ? "border-accent bg-accent text-white"
-                : "border-border bg-panel"
+                ? "border-accent bg-accent text-white shadow-glow"
+                : "border-border bg-panelSolid text-textMuted hover:text-text"
             }`}
             onClick={() => setViewMode("table")}
           >
@@ -281,10 +284,10 @@ export function ReviewExplorerPage() {
           </button>
           <button
             type="button"
-            className={`rounded-lg border px-3 py-1.5 text-xs ${
+            className={`rounded-full border px-4 py-2 text-xs font-semibold transition-all ${
               viewMode === "cards"
-                ? "border-accent bg-accent text-white"
-                : "border-border bg-panel"
+                ? "border-accent bg-accent text-white shadow-glow"
+                : "border-border bg-panelSolid text-textMuted hover:text-text"
             }`}
             onClick={() => setViewMode("cards")}
           >
@@ -313,6 +316,7 @@ export function ReviewExplorerPage() {
         <div className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
           <Card>
             <CardTitle
+              kicker="Выборка отзывов"
               title={`Список отзывов (${result.total})`}
               subtitle={selectedHotel ? selectedHotel.name : ""}
             />
@@ -333,7 +337,7 @@ export function ReviewExplorerPage() {
                     {result.items.map((item) => (
                       <tr
                         key={item.review.id}
-                        className="cursor-pointer border-b border-border/70 hover:bg-panelMuted"
+                        className="cursor-pointer border-b border-border hover:bg-panelMuted"
                         onClick={() => setSelectedReviewId(item.review.id)}
                       >
                         <td className="px-2 py-3">{formatDate(item.review.reviewDate)}</td>
@@ -358,7 +362,7 @@ export function ReviewExplorerPage() {
                 {result.items.map((item) => (
                   <article
                     key={item.review.id}
-                    className="cursor-pointer rounded-lg border border-border bg-panelMuted p-3"
+                    className="cursor-pointer rounded-[1.15rem] border border-border bg-panelMuted p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-borderStrong"
                     onClick={() => setSelectedReviewId(item.review.id)}
                   >
                     <div className="flex flex-wrap gap-2">
@@ -381,8 +385,9 @@ export function ReviewExplorerPage() {
           </Card>
           <Card>
             <CardTitle
+              kicker="Объяснимость"
               title="Объяснение по отзыву"
-              subtitle="Какие признаки дали текущую классификацию."
+              subtitle="Какие признаки дали текущую классификацию и как это трактуется менеджером объекта."
             />
             {selected ? (
               <div className="space-y-3 text-sm">
@@ -439,3 +444,6 @@ export function ReviewExplorerPage() {
     </div>
   );
 }
+
+
+

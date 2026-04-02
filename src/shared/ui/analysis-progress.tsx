@@ -1,6 +1,6 @@
 import { AnalysisRun } from "@/entities/types";
-import { Card, CardTitle } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
+import { Card, CardTitle } from "@/shared/ui/card";
 import { cn } from "@/shared/lib/cn";
 
 const STAGES: Array<{ id: string; label: string }> = [
@@ -35,6 +35,7 @@ export function AnalysisProgress({
         title="Статус обработки"
         subtitle="Система выполняет сбор и анализ отзывов. Прогресс обновляется автоматически."
       />
+
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant={isFailed ? "danger" : isDone ? "success" : "warning"}>
           {translateRunStatus(run.status)}

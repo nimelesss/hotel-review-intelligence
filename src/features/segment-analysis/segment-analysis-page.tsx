@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { Hotel, SegmentAnalyticsPayload } from "@/entities/types";
@@ -81,8 +81,10 @@ export function SegmentAnalysisPage() {
           <PageHeader
             title="Сегменты"
             subtitle="Вероятностная сегментация гостей и бизнес-смысл каждого сегмента."
+            badge="Аудитория"
             rightSlot={
               <Select
+                className="min-w-[250px]"
                 value={selectedHotelId}
                 onChange={(event) => setSelectedHotelId(event.target.value)}
               >
@@ -116,8 +118,10 @@ export function SegmentAnalysisPage() {
       <PageHeader
         title="Сегменты"
         subtitle="Вероятностная сегментация гостей и бизнес-смысл каждого сегмента."
+        badge="Аудитория"
         rightSlot={
           <Select
+            className="min-w-[250px]"
             value={selectedHotelId}
             onChange={(event) => setSelectedHotelId(event.target.value)}
           >
@@ -133,6 +137,7 @@ export function SegmentAnalysisPage() {
 
       <Card>
         <CardTitle
+          kicker="Структура аудитории"
           title="Распределение сегментов"
           subtitle="Доли сегментов и относительная уверенность классификации."
         />
@@ -141,12 +146,13 @@ export function SegmentAnalysisPage() {
 
       <Card>
         <CardTitle
+          kicker="Методика"
           title="Правила сегментации"
           subtitle="Прозрачные методические принципы, применяемые в модели."
         />
         <ul className="space-y-2">
           {payload.markerNotes.map((note) => (
-            <li key={note} className="rounded-lg border border-border bg-panelMuted p-3 text-sm">
+            <li key={note} className="rounded-[1.1rem] border border-border bg-panelMuted p-4 text-sm leading-7">
               {note}
             </li>
           ))}
@@ -192,3 +198,6 @@ function scoreToLabel(score: number): "positive" | "neutral" | "negative" {
   }
   return "neutral";
 }
+
+
+

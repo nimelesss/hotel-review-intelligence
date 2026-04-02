@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -82,6 +82,7 @@ export function DashboardPage() {
         setError(err instanceof Error ? err.message : "Не удалось загрузить список отелей.");
       }
     };
+
     void loadHotels();
   }, []);
 
@@ -92,22 +93,17 @@ export function DashboardPage() {
       setLoading(false);
       return;
     }
+
     const loadDashboard = async () => {
       setLoading(true);
       setError(null);
       try {
-        const payload = await fetchJson<DashboardPayload>(
-          `/api/hotels/${selectedHotelId}/dashboard`
-        );
+        const payload = await fetchJson<DashboardPayload>(`/api/hotels/${selectedHotelId}/dashboard`);
         setDashboard(payload);
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Не удалось загрузить сводку по отелю.";
+        const message = err instanceof Error ? err.message : "Не удалось загрузить сводку по отелю.";
         const normalizedMessage = message.toLocaleLowerCase("ru-RU");
-        if (
-          normalizedMessage.includes("отель не найден") ||
-          normalizedMessage.includes("hotel not found")
-        ) {
+        if (normalizedMessage.includes("отель не найден") || normalizedMessage.includes("hotel not found")) {
           setSelectedHotelId("");
           setDashboard(null);
           setError(null);
@@ -118,6 +114,7 @@ export function DashboardPage() {
         setLoading(false);
       }
     };
+
     void loadDashboard();
   }, [selectedHotelId, reloadKey]);
 
@@ -143,10 +140,7 @@ export function DashboardPage() {
   const onSearchInputChange = useCallback(
     (value: string) => {
       setSearchQuery(value);
-      if (
-        searchLockQuery &&
-        normalizeKey(value) !== normalizeKey(searchLockQuery)
-      ) {
+      if (searchLockQuery && normalizeKey(value) !== normalizeKey(searchLockQuery)) {
         setSearchLockQuery(null);
       }
     },
@@ -183,9 +177,7 @@ export function DashboardPage() {
     }
 
     try {
-      const response = await fetchJson<SearchHotelsResponse>(
-        `/api/hotels/search?q=${encodeURIComponent(query)}&limit=20`
-      );
+      const response = await fetchJson<SearchHotelsResponse>(`/api/hotels/search?q=${encodeURIComponent(query)}&limit=20`);
       setSearchResults(response.items);
       setShowSearchResults(true);
 
@@ -197,11 +189,7 @@ export function DashboardPage() {
       return response.items;
     } catch (err) {
       if (!silent) {
-        setSearchError(
-          err instanceof Error
-            ? err.message
-            : "Поиск временно недоступен."
-        );
+        setSearchError(err instanceof Error ? err.message : "Поиск временно недоступен.");
       }
       return [] as HotelSearchResult[];
     } finally {
@@ -233,11 +221,13 @@ export function DashboardPage() {
     if (!pendingScrollToStats || !selectedHotelId || !dashboard) {
       return;
     }
+
     const timer = setTimeout(() => {
       const anchor = document.getElementById("dashboard-stats-anchor");
       anchor?.scrollIntoView({ behavior: "smooth", block: "start" });
       setPendingScrollToStats(false);
-    }, 120);
+    }, 140);
+
     return () => clearTimeout(timer);
   }, [pendingScrollToStats, selectedHotelId, dashboard]);
 
@@ -248,11 +238,7 @@ export function DashboardPage() {
       const name = normalizeKey(item.name);
       const nameCity = normalizeKey(`${item.name}, ${item.city}`);
       const nameCityCompact = normalizeKey(`${item.name} ${item.city}`);
-      return (
-        name === normalizedQuery ||
-        nameCity === normalizedQuery ||
-        nameCityCompact === normalizedQuery
-      );
+      return name === normalizedQuery || nameCity === normalizedQuery || nameCityCompact === normalizedQuery;
     });
 
     if (exactMatch) {
@@ -263,11 +249,7 @@ export function DashboardPage() {
     if (selectedHotelId && selectedHotel) {
       const selectedName = normalizeKey(selectedHotel.name);
       const selectedNameCity = normalizeKey(`${selectedHotel.name}, ${selectedHotel.city}`);
-      if (
-        selectedName === normalizedQuery ||
-        selectedNameCity === normalizedQuery ||
-        normalizedQuery.includes(selectedName)
-      ) {
+      if (selectedName === normalizedQuery || selectedNameCity === normalizedQuery || normalizedQuery.includes(selectedName)) {
         setShowSearchResults(false);
         setSearchResults([]);
         setSearchLockQuery(searchQuery);
@@ -277,10 +259,7 @@ export function DashboardPage() {
   };
 
   const focusSearchHero = useCallback(() => {
-    document.getElementById("hotel-search-hero")?.scrollIntoView({
-      behavior: "smooth",
-      block: "start"
-    });
+    document.getElementById("hotel-search-hero")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
     window.setTimeout(() => {
       const input = document.getElementById("hotel-search-input") as HTMLInputElement | null;
@@ -332,8 +311,7 @@ export function DashboardPage() {
           externalId: candidate.externalId,
           category: "4*",
           brand: "Независимый отель",
-          description:
-            "Профиль отеля создан через поиск. Аналитика формируется после загрузки отзывов."
+          description: "Профиль отеля создан через поиск. Аналитика формируется после загрузки отзывов."
         })
       });
 
@@ -351,9 +329,7 @@ export function DashboardPage() {
       setSearchQuery(nextQuery);
       setPendingScrollToStats(true);
     } catch (err) {
-      setSearchError(
-        err instanceof Error ? err.message : "Не удалось добавить профиль отеля."
-      );
+      setSearchError(err instanceof Error ? err.message : "Не удалось добавить профиль отеля.");
     } finally {
       setSyncBusy(false);
     }
@@ -385,23 +361,19 @@ export function DashboardPage() {
       if (response.result.targetsStarted > 0) {
         setSyncMessage(
           warningsCount > 0
-            ? `Started jobs: ${response.result.targetsStarted}. Warnings: ${warningsCount}.`
-            : `Started jobs: ${response.result.targetsStarted}.`
+            ? `Запущено источников: ${response.result.targetsStarted}. Предупреждений: ${warningsCount}.`
+            : `Запущено источников: ${response.result.targetsStarted}.`
         );
       } else {
         setSyncMessage(
           warningsCount > 0
-            ? `No jobs started. Warnings: ${warningsCount}.`
-            : "No jobs started: no available sources for selected hotel."
+            ? `Сбор не стартовал. Предупреждений: ${warningsCount}.`
+            : "Сбор не стартовал: для выбранного отеля нет доступных источников."
         );
       }
       setReloadKey((prev) => prev + 1);
     } catch (err) {
-      setSearchError(
-        err instanceof Error
-          ? err.message
-          : "Не удалось запустить сбор отзывов по площадкам."
-      );
+      setSearchError(err instanceof Error ? err.message : "Не удалось запустить сбор отзывов по площадкам.");
     } finally {
       setSyncBusy(false);
     }
@@ -430,32 +402,28 @@ export function DashboardPage() {
           busy={syncBusy}
         />
         <EmptyState
-          title="Добавьте первый отель"
-          description="Найдите отель через поиск выше, создайте профиль и запустите сбор отзывов."
+          title="Начните с поиска нужного объекта"
+          description="Найдите отель по названию и городу. После выбора система откроет управленческую сводку и позволит обновить аналитику по отзывам."
         />
       </div>
     );
   }
 
   if (error && !dashboard) {
-    return (
-      <ErrorState
-        title="Ошибка загрузки сводки"
-        description={error || "Проверьте API и повторите попытку."}
-      />
-    );
+    return <ErrorState title="Ошибка загрузки сводки" description={error || "Проверьте API и повторите попытку."} />;
   }
 
   if (!dashboard || !selectedHotel) {
-    return (
-      <ErrorState
-        title="Данные по отелю недоступны"
-        description="Выберите отель или добавьте его через поиск."
-      />
-    );
+    return <ErrorState title="Данные по отелю недоступны" description="Выберите отель или добавьте его через поиск." />;
   }
 
   const { hotel, aggregate, executiveSummary, latestRun } = dashboard;
+  const sampleReviews = dashboard.sampleExplainedReviews.slice(0, 3);
+  const previewRecommendations = dashboard.recommendationsPreview.slice(0, 4);
+  const topRisks = aggregate.topicDistribution
+    .slice()
+    .sort((a, b) => b.negativeMentions - a.negativeMentions)
+    .slice(0, 6);
 
   return (
     <div className="space-y-6">
@@ -470,38 +438,24 @@ export function DashboardPage() {
         searchError={searchError}
         busy={syncBusy}
       />
-      <div id="dashboard-stats-anchor" className="scroll-mt-4" />
+      <div id="dashboard-stats-anchor" className="scroll-mt-6" />
 
       <PageHeader
-        title={APP_NAME}
-        badge="Управленческая панель"
-        subtitle={`${hotel.name}. ${UI_TEXT.productTagline}`}
+        title={hotel.name}
+        badge="Управленческая сводка"
+        subtitle={`${hotel.city}, ${hotel.country}. ${UI_TEXT.productTagline}.`}
         rightSlot={
           <>
-            <div className="min-w-[220px] rounded-lg border border-border bg-panelMuted px-3 py-2">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-textMuted">
-                Текущий отель
-              </p>
-              <p className="mt-1 text-sm font-semibold text-text">{hotel.name}</p>
-              <p className="text-xs text-textMuted">{hotel.city}</p>
-            </div>
-            <Button variant="secondary" onClick={focusSearchHero}>
-              Сменить отель
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setReloadKey((prev) => prev + 1);
-              }}
-            >
-              Обновить сводку
-            </Button>
-            <Button
-              onClick={onRunRealtimeSync}
-              disabled={syncBusy}
-              className="animate-fadePulse"
-            >
-              Собрать отзывы по площадкам
+            {latestRun ? (
+              <Badge variant={latestRun.status === "completed" ? "success" : latestRun.status === "failed" ? "danger" : "warning"}>
+                {translateRunStatus(latestRun.status)}
+              </Badge>
+            ) : null}
+            <Badge variant="default">Обновлено {formatDate(aggregate.updatedAt)}</Badge>
+            <Button variant="secondary" onClick={focusSearchHero}>Сменить отель</Button>
+            <Button variant="secondary" onClick={() => setReloadKey((prev) => prev + 1)}>Обновить сводку</Button>
+            <Button onClick={onRunRealtimeSync} disabled={syncBusy} className="animate-fadePulse">
+              {syncBusy ? "Запускаем сбор..." : "Собрать отзывы"}
             </Button>
           </>
         }
@@ -512,186 +466,144 @@ export function DashboardPage() {
       {aggregate.totalReviews === 0 ? (
         <Card>
           <CardTitle
-            title="Отзывы еще не загружены"
-            subtitle="Профиль отеля создан, но база отзывов пока пустая."
+            kicker="Готовность данных"
+            title="Отзывы для выбранного отеля пока не подключены"
+            subtitle="Профиль найден, но в текущей выборке нет данных для управленческой аналитики."
           />
-          <p className="text-sm text-textMuted">
-            Чтобы появилась аналитика, запустите сбор по площадкам кнопкой
-            {" "}
-            «Собрать отзывы по площадкам».
-          </p>
-          <p className="mt-2 text-sm text-textMuted">
-            Если после запуска данные не появились, проверьте серверные переменные:
-            {" "}
-            <code>DEFAULT_REALTIME_TARGETS_JSON</code>,
-            {" "}
-            <code>PORTFOLIO_SYNC_TARGETS_JSON</code>
-            {" "}
-            и доступность dataset URL источников.
-          </p>
+          <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+            <div className="rounded-[1.2rem] border border-border bg-panelMuted p-4">
+              <p className="text-sm leading-7 text-textMuted">
+                Чтобы заполнить сводку, запустите сбор по площадкам. Если после запуска данные не появились,
+                проверьте серверные переменные <code>DEFAULT_REALTIME_TARGETS_JSON</code>, <code>PORTFOLIO_SYNC_TARGETS_JSON</code> и доступность dataset URL источников.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <Button onClick={onRunRealtimeSync} disabled={syncBusy} size="lg">Собрать отзывы сейчас</Button>
+              <Button variant="secondary" onClick={focusSearchHero} size="lg">Выбрать другой отель</Button>
+            </div>
+          </div>
         </Card>
       ) : null}
 
-      <Card>
-        <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
+      <Card className="overflow-hidden">
+        <div className="grid gap-5 xl:grid-cols-[1.3fr_0.9fr]">
           <div>
             <CardTitle
+              kicker="Сводный вывод"
               title="Сводный вывод для руководителя"
-              subtitle="Ключевые факторы качества сервиса и репутации объекта."
+              subtitle="Ключевые сигналы по качеству сервиса, репутации и приоритетам управленческой команды."
             />
-            <p className="text-sm text-text">{executiveSummary.keyInsight}</p>
-            <p className="mt-2 text-sm text-danger">Основной риск: {executiveSummary.keyRisk}</p>
-            <p className="mt-2 text-sm text-success">
-              Главная возможность: {executiveSummary.keyOpportunity}
-            </p>
+            <p className="max-w-3xl text-[15px] leading-8 text-text">{executiveSummary.keyInsight}</p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <HighlightPanel title="Главный риск" tone="danger">{executiveSummary.keyRisk}</HighlightPanel>
+              <HighlightPanel title="Главная возможность" tone="success">{executiveSummary.keyOpportunity}</HighlightPanel>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <Badge variant="info">Статус анализа: {latestRun ? latestRun.status : "нет"}</Badge>
-            <Badge variant="default">Обновлено: {formatDate(aggregate.updatedAt)}</Badge>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+            <SnapshotTile label="Текущая выборка" value={`${aggregate.totalReviews} отзывов`} detail="Сводка строится по всем доступным отзывам выбранного объекта." />
+            <SnapshotTile label="Площадки" value={String(dashboard.dataHealth.trackedSources)} detail={dashboard.dataHealth.reviewCoverageSummary} />
+            <SnapshotTile label="Последняя дата отзыва" value={dashboard.dataHealth.lastReviewDate ? formatDate(dashboard.dataHealth.lastReviewDate) : "Не указана"} detail="Чем свежее данные, тем надежнее управленческий сигнал." />
           </div>
         </div>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          label="Средняя оценка"
-          value={formatRating(executiveSummary.averageRating)}
-          hint="Средний рейтинг по всем отзывам"
-        />
-        <KpiCard
-          label="Всего отзывов"
-          value={String(executiveSummary.totalReviews)}
-          hint="Объем анализируемой выборки"
-        />
+        <KpiCard label="Средняя оценка" value={formatRating(executiveSummary.averageRating)} hint="Средний рейтинг по всем отзывам в текущей выборке." emphasis="accent" />
+        <KpiCard label="Всего отзывов" value={String(executiveSummary.totalReviews)} hint="Объем данных, который используется в аналитической модели." />
         <KpiCard
           label="Итоговая тональность"
           value={SENTIMENT_LABELS[executiveSummary.overallSentimentLabel]}
-          hint="Интегральный индекс эмоции"
+          hint="Интегральный эмоциональный профиль текущей репутации."
+          emphasis={executiveSummary.overallSentimentLabel === "negative" ? "danger" : executiveSummary.overallSentimentLabel === "positive" ? "success" : "neutral"}
         />
-        <KpiCard
-          label="Доминирующий сегмент"
-          value={SEGMENT_LABELS[executiveSummary.dominantSegment]}
-          hint="Ключевая аудитория объекта"
-        />
+        <KpiCard label="Доминирующий сегмент" value={SEGMENT_LABELS[executiveSummary.dominantSegment]} hint="Сегмент, который чаще всего формирует текущий спрос и обратную связь." emphasis="accent" />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <Card>
-          <CardTitle
-            title="Структура аудитории"
-            subtitle="Распределение сегментов по вероятностной модели."
-          />
+          <CardTitle kicker="Структура аудитории" title="Структура аудитории" subtitle="Вероятностное распределение сегментов и их вклад в текущую картину спроса." />
           <SegmentDistributionChart data={aggregate.segmentDistribution} />
-          <p className="mt-2 text-xs text-textMuted">
-            Сегментация вероятностная и не предназначена для персонального профилирования.
-          </p>
+          <p className="mt-3 text-sm leading-6 text-textMuted">Сегментация носит вероятностный характер и используется как управленческая интерпретация отзывов, а не как персональный профиль гостя.</p>
         </Card>
         <Card>
-          <CardTitle
-            title="Репутационные риски по темам"
-            subtitle="Темы, которые чаще всего формируют негатив и просадку рейтинга."
-          />
-          <div className="space-y-2">
-            {aggregate.topicDistribution
-              .slice()
-              .sort((a, b) => b.negativeMentions - a.negativeMentions)
-              .slice(0, 8)
-              .map((topic) => (
-                <div
-                  key={topic.topic}
-                  className="flex items-center justify-between rounded-lg border border-border bg-panelMuted px-3 py-2"
-                >
+          <CardTitle kicker="Карта рисков" title="Репутационные риски по темам" subtitle="Темы, которые чаще всего создают негатив, просадку оценки и требуют внимания операционной команды." />
+          <div className="space-y-3">
+            {topRisks.map((topic) => (
+              <div key={topic.topic} className="rounded-[1.15rem] border border-border bg-panelMuted p-4">
+                <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold">{topic.label}</p>
-                    <p className="text-xs text-textMuted">
-                      Негативных упоминаний: {topic.negativeMentions}
-                    </p>
+                    <p className="text-sm font-semibold text-text">{topic.label}</p>
+                    <p className="mt-1 text-xs text-textMuted">Негативных упоминаний: {topic.negativeMentions}</p>
                   </div>
-                  <Badge variant={riskVariant(topic.riskLevel)}>{topic.riskLevel.toUpperCase()}</Badge>
+                  <Badge variant={riskVariant(topic.riskLevel)}>{topic.riskLevel}</Badge>
                 </div>
-              ))}
+                <div className="mt-3 h-2 rounded-full bg-panelStrong">
+                  <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(100, topic.negativeMentions * 10)}%` }} />
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>
-          <CardTitle
-            title="Позитивные драйверы"
-            subtitle="Что поддерживает лояльность гостей и рейтинг объекта."
-          />
+          <CardTitle kicker="Позитивные драйверы" title="Позитивные драйверы" subtitle="Что поддерживает лояльность гостей и усиливает сильные стороны объекта." />
           <TopicDriverChart data={aggregate.positiveDrivers} tone="positive" />
         </Card>
         <Card>
-          <CardTitle
-            title="Негативные драйверы"
-            subtitle="Что чаще всего приводит к жалобам и снижению оценок."
-          />
+          <CardTitle kicker="Негативные драйверы" title="Негативные драйверы" subtitle="Какие темы чаще всего вызывают жалобы и снижают воспринимаемое качество сервиса." />
           <TopicDriverChart data={aggregate.negativeDrivers} tone="negative" />
         </Card>
       </div>
 
       <Card>
-        <CardTitle
-          title="Покрытие источников и свежесть данных"
-          subtitle="Объем отзывов и динамика по каждой подключенной площадке."
-        />
-        <p className="mb-3 text-sm text-textMuted">{dashboard.dataHealth.reviewCoverageSummary}</p>
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {dashboard.sourceCoverage.length ? (
-            dashboard.sourceCoverage.map((item) => (
-              <div
-                key={item.source}
-                className="rounded-lg border border-border bg-panelMuted px-3 py-3"
-              >
+        <CardTitle kicker="Покрытие источников" title="Покрытие источников и свежесть данных" subtitle="Контроль по подключенным площадкам: объем данных, средняя оценка и текущая свежесть сигналов." />
+        <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+          <div className="rounded-[1.4rem] border border-border bg-panelMuted p-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-textMuted">Сводка покрытия</p>
+            <p className="mt-4 text-sm leading-7 text-textMuted">{dashboard.dataHealth.reviewCoverageSummary}</p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              <SnapshotTile label="Последнее обновление" value={dashboard.dataHealth.lastReviewDate ? formatDate(dashboard.dataHealth.lastReviewDate) : "Нет даты"} detail="Дата последнего зафиксированного отзыва в базе по объекту." />
+              <SnapshotTile label="Активных источников" value={String(dashboard.dataHealth.trackedSources)} detail="Количество площадок, которые реально участвуют в текущей сводке." />
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {dashboard.sourceCoverage.length ? dashboard.sourceCoverage.map((item) => (
+              <div key={item.source} className="rounded-[1.2rem] border border-border bg-panelMuted p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold">{item.label}</p>
-                  <Badge variant={sentimentVariant(scoreToLabel(item.averageSentiment))}>
-                    {SENTIMENT_LABELS[scoreToLabel(item.averageSentiment)]}
-                  </Badge>
+                  <p className="text-sm font-semibold text-text">{item.label}</p>
+                  <Badge variant={sentimentVariant(scoreToLabel(item.averageSentiment))}>{SENTIMENT_LABELS[scoreToLabel(item.averageSentiment)]}</Badge>
                 </div>
-                <p className="mt-2 text-xs text-textMuted">
-                  Отзывов: {item.reviews} ({formatPercent(item.share)})
-                </p>
-                <p className="mt-1 text-xs text-textMuted">
-                  Средняя оценка: {formatRating(item.averageRating)}
-                </p>
-                <p className="mt-1 text-xs text-textMuted">
-                  Обновление: {item.lastReviewDate ? formatDate(item.lastReviewDate) : "нет даты"}
-                </p>
+                <div className="mt-4 space-y-2 text-sm text-textMuted">
+                  <p>Отзывов: {item.reviews} ({formatPercent(item.share)})</p>
+                  <p>Средняя оценка: {formatRating(item.averageRating)}</p>
+                  <p>Последняя дата: {item.lastReviewDate ? formatDate(item.lastReviewDate) : "нет даты"}</p>
+                </div>
               </div>
-            ))
-          ) : (
-            <p className="text-sm text-textMuted">
-              Источники пока не подключены. Запустите сбор отзывов по площадкам.
-            </p>
-          )}
+            )) : <p className="text-sm leading-7 text-textMuted">Источники пока не подключены. Запустите сбор отзывов по площадкам.</p>}
+          </div>
         </div>
       </Card>
 
       <Card>
-        <CardTitle
-          title="Инсайты по сегментам"
-          subtitle="Что ценит каждый сегмент, где жалобы и как это влияет на бизнес."
-        />
-        <div className="grid gap-3 lg:grid-cols-2">
+        <CardTitle kicker="Сегменты" title="Инсайты по сегментам" subtitle="Что ценит каждый сегмент, где возникают жалобы и как это влияет на управленческие решения." />
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
           {aggregate.segmentInsights.slice(0, 6).map((item) => (
-            <div key={item.segment} className="rounded-lg border border-border bg-panelMuted p-4">
-              <div className="flex items-center justify-between gap-2">
-                <h4 className="text-sm font-semibold">{item.label}</h4>
-                <Badge variant={sentimentVariant(scoreToLabel(item.averageSentiment))}>
-                  тональность {item.averageSentiment.toFixed(2)}
-                </Badge>
+            <div key={item.segment} className="rounded-[1.25rem] border border-border bg-panelMuted p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h4 className="text-base font-semibold text-text">{item.label}</h4>
+                  <p className="mt-2 text-xs text-textMuted">Доля {formatPercent(item.share)}</p>
+                </div>
+                <Badge variant={sentimentVariant(scoreToLabel(item.averageSentiment))}>{item.averageSentiment.toFixed(2)}</Badge>
               </div>
-              <p className="mt-2 text-xs text-textMuted">
-                Доля: {formatPercent(item.share)} | Ценят:{" "}
-                {item.valuedTopics.map((topic) => TOPIC_LABELS[topic]).join(", ") || "-"}
-              </p>
-              <p className="mt-1 text-xs text-textMuted">
-                Жалобы:{" "}
-                {item.complaintTopics.map((topic) => TOPIC_LABELS[topic]).join(", ") || "-"}
-              </p>
-              <p className="mt-2 text-sm">{item.businessMeaning}</p>
+              <div className="mt-4 space-y-3 text-sm leading-6 text-textMuted">
+                <p><span className="font-semibold text-text">Ценят:</span> {item.valuedTopics.map((topic) => TOPIC_LABELS[topic]).join(", ") || "—"}</p>
+                <p><span className="font-semibold text-text">Жалуются:</span> {item.complaintTopics.map((topic) => TOPIC_LABELS[topic]).join(", ") || "—"}</p>
+              </div>
+              <p className="mt-4 text-sm leading-7 text-text">{item.businessMeaning}</p>
+              <p className="mt-4 text-xs leading-6 text-textSoft">{item.confidenceNote}</p>
             </div>
           ))}
         </div>
@@ -699,49 +611,32 @@ export function DashboardPage() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>
-          <CardTitle
-            title="Разбор отдельных отзывов"
-            subtitle="Текст -> классификация -> объяснение -> управленческий сигнал."
-          />
+          <CardTitle kicker="Объяснимость" title="Разбор отдельных отзывов" subtitle="Как конкретный текст превращается в тему, сегмент и управленческий сигнал." />
           <div className="space-y-3">
-            {dashboard.sampleExplainedReviews.map(({ review, analysis }) => (
-              <article key={review.id} className="rounded-lg border border-border bg-panelMuted p-3">
+            {sampleReviews.map(({ review, analysis }) => (
+              <article key={review.id} className="rounded-[1.2rem] border border-border bg-panelMuted p-4">
                 <div className="flex flex-wrap gap-2">
-                  <Badge variant={sentimentVariant(analysis.sentimentLabel)}>
-                    {SENTIMENT_LABELS[analysis.sentimentLabel]}
-                  </Badge>
+                  <Badge variant={sentimentVariant(analysis.sentimentLabel)}>{SENTIMENT_LABELS[analysis.sentimentLabel]}</Badge>
                   <Badge variant="info">{SEGMENT_LABELS[analysis.primarySegment]}</Badge>
-                  <Badge variant="default">
-                    Уверенность {(analysis.confidence * 100).toFixed(1)}%
-                  </Badge>
+                  <Badge variant="default">Уверенность {(analysis.confidence * 100).toFixed(1)}%</Badge>
                 </div>
-                <p className="mt-2 text-sm">{review.text}</p>
-                <p className="mt-2 text-xs text-textMuted">
-                  Почему: {analysis.explanation[2]?.details}
-                </p>
+                <p className="mt-4 text-sm leading-7 text-text">{review.text}</p>
+                <p className="mt-3 text-xs leading-6 text-textMuted">Почему система так решила: {analysis.explanation[2]?.details || analysis.explanation[0]?.details || "обнаружены тематические и тональные маркеры в тексте отзыва."}</p>
               </article>
             ))}
           </div>
         </Card>
         <Card>
-          <CardTitle
-            title="Рекомендации к действию"
-            subtitle="Приоритетные шаги по маркетингу, операционке и репутации."
-          />
+          <CardTitle kicker="Рекомендации" title="Рекомендации к действию" subtitle="Приоритетные шаги по маркетингу, операционке и репутации на основе текущего корпуса отзывов." />
           <div className="space-y-3">
-            {dashboard.recommendationsPreview.map((recommendation) => (
-              <div
-                key={recommendation.id}
-                className="rounded-lg border border-border bg-panelMuted p-3"
-              >
+            {previewRecommendations.map((recommendation) => (
+              <div key={recommendation.id} className="rounded-[1.2rem] border border-border bg-panelMuted p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="info">{translateCategory(recommendation.category)}</Badge>
-                  <Badge variant={recommendation.priority === "high" ? "danger" : "warning"}>
-                    {translatePriority(recommendation.priority)}
-                  </Badge>
+                  <Badge variant={recommendation.priority === "high" ? "danger" : recommendation.priority === "medium" ? "warning" : "default"}>{translatePriority(recommendation.priority)}</Badge>
                 </div>
-                <h4 className="mt-2 text-sm font-semibold">{recommendation.title}</h4>
-                <p className="mt-1 text-sm text-textMuted">{recommendation.rationale}</p>
+                <h4 className="mt-4 text-base font-semibold text-text">{recommendation.title}</h4>
+                <p className="mt-2 text-sm leading-7 text-textMuted">{recommendation.rationale}</p>
               </div>
             ))}
           </div>
@@ -749,33 +644,10 @@ export function DashboardPage() {
       </div>
 
       <Card>
-        <CardTitle
-          title="Операционные приоритеты"
-          subtitle="Задачи, которые стоит поставить на контроль менеджменту объекта."
-        />
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-lg border border-border bg-panelMuted p-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-textMuted">Риски</p>
-            <ul className="mt-2 space-y-2 text-sm">
-              {aggregate.keyRisks.length ? (
-                aggregate.keyRisks.map((risk) => <li key={risk}>• {risk}</li>)
-              ) : (
-                <li>• Критичные риски не выявлены.</li>
-              )}
-            </ul>
-          </div>
-          <div className="rounded-lg border border-border bg-panelMuted p-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-textMuted">
-              Возможности роста
-            </p>
-            <ul className="mt-2 space-y-2 text-sm">
-              {aggregate.growthOpportunities.length ? (
-                aggregate.growthOpportunities.map((item) => <li key={item}>• {item}</li>)
-              ) : (
-                <li>• Выраженные возможности роста не выявлены на текущей выборке.</li>
-              )}
-            </ul>
-          </div>
+        <CardTitle kicker="Приоритеты управления" title="Операционные приоритеты" subtitle="Задачи, которые стоит поставить на контроль команде управления объектом уже сейчас." />
+        <div className="grid gap-4 md:grid-cols-2">
+          <PriorityList title="Риски" items={aggregate.keyRisks} emptyLabel="Критичные риски не выявлены." tone="danger" />
+          <PriorityList title="Возможности роста" items={aggregate.growthOpportunities} emptyLabel="Выраженные возможности роста не выявлены на текущей выборке." tone="success" />
         </div>
       </Card>
     </div>
@@ -793,87 +665,109 @@ function SearchHero(props: {
   searchError: string | null;
   busy: boolean;
 }) {
-  const {
-    searchQuery,
-    setSearchQuery,
-    onSearchHotels,
-    searching,
-    showSearchResults,
-    searchResults,
-    onCreateHotelFromSearch,
-    searchError,
-    busy
-  } = props;
+  const { searchQuery, setSearchQuery, onSearchHotels, searching, showSearchResults, searchResults, onCreateHotelFromSearch, searchError, busy } = props;
 
   return (
     <div id="hotel-search-hero">
-      <Card className="search-hero-card relative overflow-hidden border-border">
-      <div className="search-hero-orb pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-cyan-200/55 blur-2xl" />
-      <div className="search-hero-orb pointer-events-none absolute -bottom-12 -right-10 h-48 w-48 rounded-full bg-blue-200/45 blur-2xl" />
-      <CardTitle
-        title="Найдите любой отель в России"
-        subtitle="Введите название отеля и город. После добавления запустите сбор отзывов по площадкам."
-      />
-      <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-        <Input
-          id="hotel-search-input"
-          value={searchQuery}
-          placeholder="Например: Courtyard by Marriott Ростов-на-Дону"
-          onChange={(event) => setSearchQuery(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              void onSearchHotels();
-            }
-          }}
-        />
-        <Button
-          onClick={() => {
-            void onSearchHotels();
-          }}
-          disabled={searching}
-          className={searching ? "animate-pulse" : ""}
-        >
-          {searching
-            ? "Ищем отели..."
-            : "Найти отель"}
-        </Button>
-      </div>
-
-      <p className="mt-2 text-xs text-textMuted">
-        {"Подсказки появляются автоматически при вводе 2+ символов."}
-      </p>
-
-      {searchError ? <p className="mt-3 text-sm text-danger">{searchError}</p> : null}
-
-      {showSearchResults && searchResults.length > 0 ? (
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          {searchResults.map((item) => (
-            <article
-              key={item.externalId}
-              className="search-result-card rounded-lg border border-border bg-panelMuted p-3"
-            >
-              <p className="text-sm font-semibold">{item.name}</p>
-              <p className="mt-1 text-xs text-textMuted">
-                {item.city}, {item.country}
-              </p>
-              <p className="mt-1 text-xs text-textMuted">{item.address}</p>
-              <div className="mt-3">
-                <Button
-                  variant="secondary"
-                  disabled={busy}
-                  onClick={() => {
-                    void onCreateHotelFromSearch(item);
-                  }}
-                >
-                  Добавить в аналитику
-                </Button>
-              </div>
-            </article>
-          ))}
+      <Card className="search-hero-card relative overflow-hidden px-0 py-0 shadow-panel">
+        <div className="search-hero-orb pointer-events-none absolute -left-12 top-3 h-44 w-44 rounded-full bg-cyan-200/45 blur-3xl" />
+        <div className="search-hero-orb pointer-events-none absolute -right-12 bottom-4 h-56 w-56 rounded-full bg-sky-200/35 blur-3xl" />
+        <div className="grid gap-0 xl:grid-cols-[1.15fr_0.85fr]">
+          <div className="relative px-5 py-6 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
+            <Badge variant="info">{APP_NAME}</Badge>
+            <h2 className="mt-5 max-w-3xl text-3xl font-semibold leading-[1.02] text-text sm:text-[2.8rem]">Найдите отель и откройте готовую управленческую аналитику за минуты, а не после ручного чтения сотен отзывов.</h2>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-textMuted sm:text-[15px]">Поиск по каталогу российских объектов, быстрый выбор профиля и переход к executive dashboard без перегруженного интерфейса.</p>
+            <div className="mt-6 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+              <Input id="hotel-search-input" value={searchQuery} className="min-h-14 bg-panelSolid text-base" placeholder="Например: Courtyard by Marriott Ростов-на-Дону" onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void onSearchHotels(); } }} />
+              <Button onClick={() => { void onSearchHotels(); }} disabled={searching} size="lg" className={searching ? "animate-pulse" : ""}>{searching ? "Ищем отели..." : "Найти отель"}</Button>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <MiniHeroPill>Только гостиничные объекты</MiniHeroPill>
+              <MiniHeroPill>Премиальная управленческая панель</MiniHeroPill>
+              <MiniHeroPill>Объяснимая аналитика</MiniHeroPill>
+            </div>
+            <p className="mt-4 text-xs tracking-[0.04em] text-textMuted">Подсказки появляются автоматически при вводе 2+ символов.</p>
+            {searchError ? <p className="mt-3 text-sm leading-6 text-danger">{searchError}</p> : null}
+          </div>
+          <div className="hidden border-l border-border xl:block">
+            <div className="grid h-full gap-3 p-6">
+              <HeroInsightCard kicker="01 / Поиск" title="Найдите нужный объект" description="Система подсказывает только релевантные отели и не перегружает экран десятками лишних сущностей." />
+              <HeroInsightCard kicker="02 / Интерпретация" title="Сразу к управленческой картине" description="После выбора отеля вы видите не витрину, а операционные сигналы, риски, сегменты и рекомендации." />
+              <HeroInsightCard kicker="03 / Действие" title="Решения, а не просто графики" description="Интерфейс строится вокруг действий: усилить сильные стороны, исправить слабые темы, удержать сегменты." />
+            </div>
+          </div>
         </div>
-      ) : null}
+        {showSearchResults && searchResults.length > 0 ? (
+          <div className="border-t border-border px-5 py-5 sm:px-6 lg:px-8">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-textMuted">Подходящие объекты</p>
+                <p className="mt-1 text-sm text-textMuted">Выберите подходящий объект, чтобы открыть или создать профиль в аналитике.</p>
+              </div>
+              <Badge variant="default">{searchResults.length} найдено</Badge>
+            </div>
+            <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+              {searchResults.map((item) => (
+                <article key={item.externalId} className="search-result-card rounded-[1.35rem] border border-border bg-panelSolid p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-base font-semibold text-text">{item.name}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.12em] text-textMuted">{item.city}, {item.country}</p>
+                    </div>
+                    <span className="mt-1 h-2.5 w-2.5 rounded-full bg-accent shadow-glow" />
+                  </div>
+                  <p className="mt-4 min-h-[3.25rem] text-sm leading-6 text-textMuted">{item.address}</p>
+                  <div className="mt-4">
+                    <Button variant="secondary" disabled={busy} onClick={() => { void onCreateHotelFromSearch(item); }}>Открыть в аналитике</Button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </Card>
+    </div>
+  );
+}
+
+function MiniHeroPill({ children }: { children: React.ReactNode }) {
+  return <span className="inline-flex items-center rounded-full border border-border bg-panelSolid px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-textMuted">{children}</span>;
+}
+
+function HeroInsightCard({ kicker, title, description }: { kicker: string; title: string; description: string }) {
+  return (
+    <div className="rounded-[1.35rem] border border-border bg-panelSolid p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-textMuted">{kicker}</p>
+      <h3 className="mt-3 text-lg font-semibold text-text">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-textMuted">{description}</p>
+    </div>
+  );
+}
+
+function HighlightPanel({ title, tone, children }: { title: string; tone: "success" | "danger"; children: React.ReactNode }) {
+  return (
+    <div className={`rounded-[1.3rem] border p-4 ${tone === "success" ? "border-emerald-500/18 bg-emerald-500/8" : "border-rose-500/18 bg-rose-500/8"}`}>
+      <p className={`text-[11px] font-semibold uppercase tracking-[0.22em] ${tone === "success" ? "text-success" : "text-danger"}`}>{title}</p>
+      <p className="mt-3 text-sm leading-7 text-text">{children}</p>
+    </div>
+  );
+}
+
+function SnapshotTile({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <div className="rounded-[1.2rem] border border-border bg-panelMuted p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-textMuted">{label}</p>
+      <p className="mt-3 text-xl font-semibold text-text">{value}</p>
+      <p className="mt-3 text-sm leading-6 text-textMuted">{detail}</p>
+    </div>
+  );
+}
+
+function PriorityList({ title, items, emptyLabel, tone }: { title: string; items: string[]; emptyLabel: string; tone: "success" | "danger" }) {
+  return (
+    <div className="rounded-[1.35rem] border border-border bg-panelMuted p-4">
+      <p className={`text-[11px] font-semibold uppercase tracking-[0.22em] ${tone === "success" ? "text-success" : "text-danger"}`}>{title}</p>
+      <ul className="mt-4 space-y-3 text-sm leading-7 text-textMuted">{items.length ? items.map((item) => <li key={item}>• {item}</li>) : <li>• {emptyLabel}</li>}</ul>
     </div>
   );
 }
@@ -907,16 +801,26 @@ function translatePriority(priority: string): string {
   return map[priority] || priority;
 }
 
+function translateRunStatus(status: AnalysisRun["status"]): string {
+  if (status === "completed") {
+    return "Сводка актуальна";
+  }
+  if (status === "failed") {
+    return "Нужна проверка";
+  }
+  if (status === "running") {
+    return "Данные обновляются";
+  }
+  return "Ожидает запуска";
+}
+
 function normalizeKey(value: string): string {
   return value.toLocaleLowerCase("ru-RU").replace(/\s+/g, " ").trim();
 }
 
 function findBestExistingHotel(hotels: Hotel[], candidate: HotelSearchResult): Hotel | undefined {
   return hotels
-    .map((hotel) => ({
-      hotel,
-      score: scoreExistingHotel(hotel, candidate)
-    }))
+    .map((hotel) => ({ hotel, score: scoreExistingHotel(hotel, candidate) }))
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score)
     .map((entry) => entry.hotel)[0];
@@ -941,9 +845,7 @@ function resolveSyncHotelSelection(selectedHotelId: string, hotels: Hotel[]): Ho
     source: "catalog_import"
   };
 
-  const reviewedHotels = hotels.filter(
-    (hotel) => hotel.id !== selected.id && (hotel.reviewCount ?? 0) > 0
-  );
+  const reviewedHotels = hotels.filter((hotel) => hotel.id !== selected.id && (hotel.reviewCount ?? 0) > 0);
   return findBestExistingHotel(reviewedHotels, candidate) || selected;
 }
 
@@ -990,7 +892,6 @@ function scoreExistingHotel(hotel: Hotel, candidate: HotelSearchResult): number 
   }
 
   score += Math.min(hotel.reviewCount ?? 0, 300) * 0.05;
-
   return score;
 }
 
@@ -1008,24 +909,7 @@ function buildHotelMatchKeys(name: string, city: string): Set<string> {
   const translitStrippedName = transliterateCyrillicToLatin(aliasStrippedName);
   const translitStrippedFull = transliterateCyrillicToLatin(aliasStrippedFull);
 
-  return new Set(
-    [
-      baseName,
-      baseFull,
-      strippedName,
-      strippedFull,
-      aliasName,
-      aliasFull,
-      aliasStrippedName,
-      aliasStrippedFull,
-      translitName,
-      translitFull,
-      translitStrippedName,
-      translitStrippedFull
-    ].filter(
-      (value) => value.length >= 2
-    )
-  );
+  return new Set([baseName, baseFull, strippedName, strippedFull, aliasName, aliasFull, aliasStrippedName, aliasStrippedFull, translitName, translitFull, translitStrippedName, translitStrippedFull].filter((value) => value.length >= 2));
 }
 
 function replaceBrandAliases(value: string): string {
@@ -1039,42 +923,14 @@ function replaceBrandAliases(value: string): string {
 
 function transliterateCyrillicToLatin(value: string): string {
   const map: Record<string, string> = {
-    а: "a",
-    б: "b",
-    в: "v",
-    г: "g",
-    д: "d",
-    е: "e",
-    ё: "e",
-    ж: "zh",
-    з: "z",
-    и: "i",
-    й: "y",
-    к: "k",
-    л: "l",
-    м: "m",
-    н: "n",
-    о: "o",
-    п: "p",
-    р: "r",
-    с: "s",
-    т: "t",
-    у: "u",
-    ф: "f",
-    х: "h",
-    ц: "ts",
-    ч: "ch",
-    ш: "sh",
-    щ: "sch",
-    ъ: "",
-    ы: "y",
-    ь: "",
-    э: "e",
-    ю: "yu",
-    я: "ya"
+    а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "h", ц: "ts", ч: "ch", ш: "sh", щ: "sch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya"
   };
 
-  return [...value]
-    .map((char) => map[char.toLocaleLowerCase("ru-RU")] ?? char)
-    .join("");
+  return [...value].map((char) => map[char.toLocaleLowerCase("ru-RU")] ?? char).join("");
 }
+
+
+
+
+
+

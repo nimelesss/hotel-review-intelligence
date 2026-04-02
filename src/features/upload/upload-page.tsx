@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -49,7 +49,7 @@ function presentRunSource(run: AnalysisRun): string {
     case "russian_travel_dataset":
       return "Комбинированный набор площадок";
     case "apify_dataset":
-      return "Dataset connector";
+      return "Внешний dataset";
     default:
       return source;
   }
@@ -301,7 +301,7 @@ export function UploadPage() {
       <PageHeader
         title="Загрузка данных"
         subtitle="Создайте профиль отеля, выполните сбор отзывов и контролируйте статус обработки."
-        badge="Ingestion"
+        badge="Импорт"
       />
 
       <Card className="anim-delay-1">
@@ -394,7 +394,7 @@ export function UploadPage() {
             <option value="two_gis_dataset">2ГИС / Flamp</option>
             <option value="ostrovok_dataset">Островок</option>
             <option value="russian_travel_dataset">Комбинированный набор площадок</option>
-            <option value="apify_dataset">Dataset connector</option>
+            <option value="apify_dataset">Внешний dataset</option>
           </Select>
 
           <Input
@@ -411,7 +411,7 @@ export function UploadPage() {
 
           <Input
             className="md:col-span-2 xl:col-span-4"
-            placeholder="Dataset URL: https://api.apify.com/v2/datasets/<id>/items?token=..."
+            placeholder="URL dataset: https://api.apify.com/v2/datasets/<id>/items?token=..."
             value={datasetUrl}
             onChange={(event) => setDatasetUrl(event.target.value)}
           />
@@ -426,7 +426,7 @@ export function UploadPage() {
           <Badge variant="info">пайплайн: сбор → нормализация → дедупликация → анализ</Badge>
         </div>
         <p className="mt-2 text-xs text-textMuted">
-          Для одиночного запуска укажите provider + dataset URL. Для мультисбора используются источники из серверной конфигурации.
+          Для одиночного запуска укажите источник и ссылку на dataset. Для мультисбора используются источники из серверной конфигурации.
         </p>
       </Card>
 
@@ -544,7 +544,7 @@ export function UploadPage() {
                 {runs.map((run) => (
                   <tr
                     key={run.id}
-                    className="cursor-pointer border-b border-border/60 hover:bg-panelMuted"
+                    className="cursor-pointer border-b border-border hover:bg-panelMuted"
                     onClick={() => setActiveRunId(run.id)}
                   >
                     <td className="px-2 py-3">{run.id}</td>
@@ -606,3 +606,5 @@ function translateRunStage(stage?: string): string {
   };
   return map[stage] || stage;
 }
+
+
