@@ -648,7 +648,6 @@ function SearchHero(props: {
           <div className="relative px-5 py-6 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
             <Badge variant="info">{APP_NAME}</Badge>
             <h2 className="mt-5 max-w-3xl text-3xl font-semibold leading-[1.02] text-text sm:text-[2.8rem]">Найдите отель и откройте готовую управленческую аналитику за минуты, а не после ручного чтения сотен отзывов.</h2>
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-textMuted sm:text-[15px]">Поиск по каталогу российских объектов, быстрый выбор профиля и мгновенный переход к управленческой аналитике без перегруженного интерфейса.</p>
             <div className="mt-6 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
               <Input id="hotel-search-input" value={searchQuery} className="min-h-14 bg-panelSolid text-base" placeholder="Например: Courtyard by Marriott Ростов-на-Дону" onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void onSearchHotels(); } }} />
               <Button onClick={() => { void onSearchHotels(); }} disabled={searching} size="lg" className={searching ? "animate-pulse" : ""}>{searching ? "Ищем отели..." : "Найти отель"}</Button>

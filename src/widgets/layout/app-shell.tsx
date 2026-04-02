@@ -115,24 +115,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               })}
             </nav>
 
-            <div className="mt-6 rounded-[1.5rem] border border-border bg-panelMuted p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-textMuted">Принцип интерфейса</p>
-              <p className="mt-3 text-sm leading-6 text-text">Меньше визуального шума, больше управленческой ясности: сигналы, риски, действия.</p>
-              <div className="mt-4 grid gap-2 text-xs text-textMuted">
-                <div className="flex items-center justify-between rounded-full border border-border bg-panelSolid px-3 py-2">
-                  <span>Анимация</span>
-                  <span>Сдержанно и премиально</span>
-                </div>
-                <div className="flex items-center justify-between rounded-full border border-border bg-panelSolid px-3 py-2">
-                  <span>Плотность</span>
-                  <span>Для руководителя</span>
-                </div>
-                <div className="flex items-center justify-between rounded-full border border-border bg-panelSolid px-3 py-2">
-                  <span>Объяснимость</span>
-                  <span>Всегда рядом</span>
-                </div>
-              </div>
-            </div>
           </div>
         </aside>
 
