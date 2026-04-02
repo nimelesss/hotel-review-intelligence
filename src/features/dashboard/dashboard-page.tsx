@@ -596,41 +596,41 @@ function CityBenchmarkCard(props: {
       />
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-6">
-        <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 p-4 text-center">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Перцентиль</p>
+        <div className="rounded-[1.15rem] border border-border bg-panelMuted/75 p-4 text-center shadow-insetSoft">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-textMuted">Перцентиль</p>
           <p className={`text-3xl font-bold ${pctColor}`}>{benchmark.ratingPercentile}%</p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">топ-{100 - benchmark.ratingPercentile}%</p>
+          <p className="mt-1 text-xs text-textSoft">топ-{100 - benchmark.ratingPercentile}%</p>
         </div>
-        <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 p-4 text-center">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Место в городе</p>
-          <p className="text-3xl font-bold text-neutral-800 dark:text-neutral-100">{benchmark.ratingRank}<span className="text-base font-normal text-neutral-400">/{benchmark.hotelCount}</span></p>
+        <div className="rounded-[1.15rem] border border-border bg-panelMuted/75 p-4 text-center shadow-insetSoft">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-textMuted">Место в городе</p>
+          <p className="text-3xl font-bold text-text">{benchmark.ratingRank}<span className="text-base font-medium text-textSoft">/{benchmark.hotelCount}</span></p>
         </div>
-        <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 p-4 text-center">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Ваш рейтинг</p>
-          <p className="text-3xl font-bold text-neutral-800 dark:text-neutral-100">{formatRating(benchmark.hotelRating)}</p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">среднее по городу: {formatRating(benchmark.avgRating)}</p>
+        <div className="rounded-[1.15rem] border border-border bg-panelMuted/75 p-4 text-center shadow-insetSoft">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-textMuted">Ваш рейтинг</p>
+          <p className="text-3xl font-bold text-text">{formatRating(benchmark.hotelRating)}</p>
+          <p className="mt-1 text-xs text-textSoft">среднее по городу: {formatRating(benchmark.avgRating)}</p>
         </div>
-        <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 p-4 text-center">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Отелей в городе</p>
-          <p className="text-3xl font-bold text-neutral-800 dark:text-neutral-100">{benchmark.hotelCount}</p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{benchmark.totalReviews} отзывов</p>
+        <div className="rounded-[1.15rem] border border-border bg-panelMuted/75 p-4 text-center shadow-insetSoft">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-textMuted">Отелей в городе</p>
+          <p className="text-3xl font-bold text-text">{benchmark.hotelCount}</p>
+          <p className="mt-1 text-xs text-textSoft">{benchmark.totalReviews} отзывов</p>
         </div>
       </div>
 
       {benchmark.topCompetitors.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-3 uppercase tracking-wider">Ближайшие конкуренты</p>
+          <p className="mb-3 text-xs font-medium uppercase tracking-wider text-textMuted">Ближайшие конкуренты</p>
           <div className="space-y-2">
             {benchmark.topCompetitors.map((comp, i) => {
               const isAbove = comp.rating > benchmark.hotelRating;
               return (
                 <div
                   key={i}
-                  className="flex items-center justify-between rounded-md border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-sm"
+                  className="flex items-center justify-between rounded-[1rem] border border-border bg-panelMuted/65 px-3 py-2 text-sm shadow-insetSoft"
                 >
-                  <span className="text-neutral-700 dark:text-neutral-300 truncate mr-3">{comp.name}</span>
+                  <span className="mr-3 truncate text-text">{comp.name}</span>
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-neutral-400 text-xs">{comp.reviewCount} отз.</span>
+                    <span className="text-xs text-textSoft">{comp.reviewCount} отз.</span>
                     <Badge variant={isAbove ? "danger" : "success"}>
                       {formatRating(comp.rating)}
                     </Badge>
@@ -644,15 +644,15 @@ function CityBenchmarkCard(props: {
 
       {benchmark.categoryBreakdown.length > 0 && (
         <div className="mt-5">
-          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-3 uppercase tracking-wider">Распределение по рейтингу</p>
+          <p className="mb-3 text-xs font-medium uppercase tracking-wider text-textMuted">Распределение по рейтингу</p>
           <div className="flex gap-2">
             {benchmark.categoryBreakdown.map((cat) => {
               const pct = benchmark.hotelCount > 0 ? Math.round((cat.count / benchmark.hotelCount) * 100) : 0;
               return (
-                <div key={cat.label} className="flex-1 rounded-md border border-neutral-200 dark:border-neutral-700 p-2 text-center">
-                  <p className="text-xs text-neutral-400">{cat.label}</p>
-                  <p className="text-lg font-semibold text-neutral-700 dark:text-neutral-200">{cat.count}</p>
-                  <p className="text-[10px] text-neutral-400">{pct}%</p>
+                <div key={cat.label} className="flex-1 rounded-[1rem] border border-border bg-panelMuted/65 p-2 text-center shadow-insetSoft">
+                  <p className="text-xs text-textMuted">{cat.label}</p>
+                  <p className="text-lg font-semibold text-text">{cat.count}</p>
+                  <p className="text-[10px] text-textSoft">{pct}%</p>
                 </div>
               );
             })}
@@ -891,7 +891,6 @@ function transliterateCyrillicToLatin(value: string): string {
 
   return [...value].map((char) => map[char.toLocaleLowerCase("ru-RU")] ?? char).join("");
 }
-
 
 
 
