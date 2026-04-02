@@ -2,11 +2,11 @@ import { HotelSearchResult } from "@/entities/types";
 
 export const seedHotelSearchCatalog: HotelSearchResult[] = [
   {
-    externalId: "seed-courtyard-rostov",
-    name: "Courtyard by Marriott Rostov-on-Don",
+    externalId: "hotel-1865338827",
+    name: "Кортъярд Отель",
     city: "Ростов-на-Дону",
     country: "Россия",
-    address: "Ростов-на-Дону, Россия",
+    address: "Ростов-на-Дону, Левобережная 2К",
     source: "catalog_seed"
   },
   {
@@ -162,4 +162,3 @@ export const seedHotelSearchCatalog: HotelSearchResult[] = [
     source: "catalog_seed"
   }
 ];
-

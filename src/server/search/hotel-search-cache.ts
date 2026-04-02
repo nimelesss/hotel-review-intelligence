@@ -26,6 +26,7 @@ const ADDRESS_ADMIN_WORDS = [
   "county",
   "region"
 ];
+const DEPRECATED_EXTERNAL_IDS = new Set(["seed-courtyard-rostov"]);
 
 let memoryCache: HotelSearchResult[] | null = null;
 let memoryLoadedAt = 0;
@@ -309,6 +310,11 @@ function sanitizeCatalogItem(item: HotelSearchResult): HotelSearchResult | null 
     return null;
   }
 
+  const rawExternalId = normalizeWhitespace(decodeEscapedUnicode(item.externalId || ""));
+  if (DEPRECATED_EXTERNAL_IDS.has(rawExternalId)) {
+    return null;
+  }
+
   const name = normalizeWhitespace(decodeEscapedUnicode(item.name || ""));
   const city = normalizeWhitespace(decodeEscapedUnicode(item.city || ""));
   if (!name || !city) {
@@ -319,9 +325,8 @@ function sanitizeCatalogItem(item: HotelSearchResult): HotelSearchResult | null 
   const address =
     normalizeWhitespace(decodeEscapedUnicode(item.address || `${name}, ${city}`)) || `${name}, ${city}`;
 
-  const externalIdRaw = normalizeWhitespace(decodeEscapedUnicode(item.externalId || ""));
   const externalId =
-    externalIdRaw ||
+    rawExternalId ||
     `cache-${normalize(name).replace(/\s+/g, "-")}-${normalize(city).replace(/\s+/g, "-")}`;
 
   return {
