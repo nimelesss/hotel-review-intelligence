@@ -15,30 +15,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-
-      - name: Validate build on runner
-        run: |
-          set -euo pipefail
-          npm ci --no-audit --no-fund
-          npm run build
-
       - name: Deploy to VPS over SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
-          port: ${{ secrets.VPS_PORT || 22 }}
+          port: 22
           script_stop: true
           command_timeout: 30m
-          script_path: scripts/deploy-vps.sh
+          script: |
+            set -euo pipefail
+            cd /srv/hotel-review-intelligence
+            bash scripts/deploy-vps.sh
