@@ -1,9 +1,11 @@
 import {
   AnalysisRun,
+  CityBenchmark,
   CreateHotelRequest,
   DashboardDataHealth,
   DashboardPayload,
   ExecutiveSummary,
+  Hotel,
   IngestionImportRequest,
   IngestionPreviewResult,
   PlatformIngestionRequest,
@@ -63,6 +65,8 @@ export function getDashboardPayload(hotelIdRaw?: string): DashboardPayload {
   const sourceCoverage = buildSourceCoverage(hotelId);
   const dataHealth = buildDashboardDataHealth(sourceCoverage);
 
+  const cityBenchmark = buildCityBenchmark(hotel);
+
   return {
     hotel,
     aggregate,
@@ -71,7 +75,8 @@ export function getDashboardPayload(hotelIdRaw?: string): DashboardPayload {
     sourceCoverage,
     dataHealth,
     latestRun,
-    executiveSummary: buildExecutiveSummary(aggregate)
+    executiveSummary: buildExecutiveSummary(aggregate),
+    cityBenchmark
   };
 }
 
@@ -348,6 +353,94 @@ function ensureHotelAnalytics(hotelId: string) {
     outcome.run
   );
   return outcome.aggregate;
+}
+
+function buildCityBenchmark(hotel: Hotel): CityBenchmark | undefined {
+  const repository = getRepository();
+  const allHotels = repository.listHotels();
+  const cityHotels = allHotels.filter(
+    (h) =>
+      h.city.toLocaleLowerCase("ru-RU") === hotel.city.toLocaleLowerCase("ru-RU") &&
+      (h.reviewCount ?? 0) > 0
+  );
+
+  if (cityHotels.length < 2) {
+    return undefined;
+  }
+
+  const ratings = cityHotels
+    .map((h) => {
+      const reviews = repository.listReviewsByHotel(h.id);
+      if (!reviews.length) return null;
+      const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+      return { id: h.id, name: h.name, rating: Math.round(avg * 100) / 100, reviewCount: reviews.length };
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null);
+
+  if (ratings.length < 2) {
+    return undefined;
+  }
+
+  const sorted = [...ratings].sort((a, b) => b.rating - a.rating);
+  const hotelEntry = sorted.find((r) => r.id === hotel.id);
+  if (!hotelEntry) {
+    return undefined;
+  }
+
+  const rank = sorted.indexOf(hotelEntry) + 1;
+  const percentile = Math.round(((sorted.length - rank) / sorted.length) * 100);
+
+  const allRatings = sorted.map((r) => r.rating);
+  const avgRating = Math.round(
+    (allRatings.reduce((s, v) => s + v, 0) / allRatings.length) * 100
+  ) / 100;
+  const medianIdx = Math.floor(allRatings.length / 2);
+  const medianRating = allRatings.length % 2
+    ? allRatings[medianIdx]
+    : Math.round(((allRatings[medianIdx - 1] + allRatings[medianIdx]) / 2) * 100) / 100;
+
+  const topCompetitors = sorted
+    .filter((r) => r.id !== hotel.id)
+    .slice(0, 5)
+    .map((r) => ({ name: r.name, rating: r.rating, reviewCount: r.reviewCount }));
+
+  const totalReviews = ratings.reduce((s, r) => s + r.reviewCount, 0);
+
+  // Rating distribution buckets
+  const buckets = [
+    { label: "9.0–10.0", min: 9, max: 10.01 },
+    { label: "7.0–8.9", min: 7, max: 9 },
+    { label: "5.0–6.9", min: 5, max: 7 },
+    { label: "< 5.0", min: 0, max: 5 }
+  ];
+  const categoryBreakdown = buckets.map((b) => ({
+    label: b.label,
+    count: ratings.filter((r) => r.rating >= b.min && r.rating < b.max).length
+  }));
+
+  const diff = hotelEntry.rating - avgRating;
+  const diffSign = diff >= 0 ? "+" : "";
+  const summary = percentile >= 75
+    ? `${hotel.name} входит в топ-${100 - percentile}% отелей ${hotel.city} по рейтингу (${diffSign}${diff.toFixed(1)} к среднему).`
+    : percentile >= 50
+    ? `${hotel.name} выше среднего среди отелей ${hotel.city} (${diffSign}${diff.toFixed(1)} к среднему).`
+    : percentile >= 25
+    ? `${hotel.name} немного ниже среднего среди отелей ${hotel.city} (${diffSign}${diff.toFixed(1)} к среднему).`
+    : `${hotel.name} в нижнем квартиле отелей ${hotel.city} (${diffSign}${diff.toFixed(1)} к среднему). Требуется внимание.`;
+
+  return {
+    city: hotel.city,
+    hotelCount: ratings.length,
+    totalReviews,
+    avgRating,
+    medianRating,
+    hotelRating: hotelEntry.rating,
+    ratingPercentile: percentile,
+    ratingRank: rank,
+    topCompetitors,
+    categoryBreakdown,
+    summary
+  };
 }
 
 function buildExecutiveSummary(aggregate: DashboardPayload["aggregate"]): ExecutiveSummary {

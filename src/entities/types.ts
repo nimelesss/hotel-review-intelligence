@@ -322,6 +322,27 @@ export interface DashboardDataHealth {
   reviewCoverageSummary: string;
 }
 
+export interface CityBenchmark {
+  city: string;
+  hotelCount: number;
+  totalReviews: number;
+  avgRating: number;
+  medianRating: number;
+  hotelRating: number;
+  ratingPercentile: number;
+  ratingRank: number;
+  topCompetitors: Array<{
+    name: string;
+    rating: number;
+    reviewCount: number;
+  }>;
+  categoryBreakdown: Array<{
+    label: string;
+    count: number;
+  }>;
+  summary: string;
+}
+
 export interface DashboardPayload {
   hotel: Hotel;
   aggregate: HotelAggregate;
@@ -334,6 +355,7 @@ export interface DashboardPayload {
   dataHealth: DashboardDataHealth;
   latestRun?: AnalysisRun;
   executiveSummary: ExecutiveSummary;
+  cityBenchmark?: CityBenchmark;
 }
 
 export interface ReviewsQuery {

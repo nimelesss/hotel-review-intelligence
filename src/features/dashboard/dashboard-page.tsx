@@ -565,7 +565,101 @@ export function DashboardPage() {
           <PriorityList title="Возможности роста" items={aggregate.growthOpportunities} emptyLabel="Выраженные возможности роста не выявлены на текущей выборке." tone="success" />
         </div>
       </Card>
+
+      {dashboard.cityBenchmark && (
+        <CityBenchmarkCard benchmark={dashboard.cityBenchmark} hotelName={stripAccommodationWords(hotel.name) || hotel.name} />
+      )}
     </div>
+  );
+}
+
+function CityBenchmarkCard(props: {
+  benchmark: NonNullable<DashboardPayload["cityBenchmark"]>;
+  hotelName: string;
+}) {
+  const { benchmark, hotelName } = props;
+  const pctColor =
+    benchmark.ratingPercentile >= 75
+      ? "text-emerald-600 dark:text-emerald-400"
+      : benchmark.ratingPercentile >= 50
+      ? "text-sky-600 dark:text-sky-400"
+      : benchmark.ratingPercentile >= 25
+      ? "text-amber-600 dark:text-amber-400"
+      : "text-red-600 dark:text-red-400";
+
+  return (
+    <Card>
+      <CardTitle
+        kicker="Конкурентный анализ"
+        title={`Позиция в ${benchmark.city}`}
+        subtitle={benchmark.summary}
+      />
+
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+        <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 p-4 text-center">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Перцентиль</p>
+          <p className={`text-3xl font-bold ${pctColor}`}>{benchmark.ratingPercentile}%</p>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">топ-{100 - benchmark.ratingPercentile}%</p>
+        </div>
+        <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 p-4 text-center">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Место в городе</p>
+          <p className="text-3xl font-bold text-neutral-800 dark:text-neutral-100">{benchmark.ratingRank}<span className="text-base font-normal text-neutral-400">/{benchmark.hotelCount}</span></p>
+        </div>
+        <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 p-4 text-center">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Ваш рейтинг</p>
+          <p className="text-3xl font-bold text-neutral-800 dark:text-neutral-100">{formatRating(benchmark.hotelRating)}</p>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">среднее по городу: {formatRating(benchmark.avgRating)}</p>
+        </div>
+        <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 p-4 text-center">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Отелей в городе</p>
+          <p className="text-3xl font-bold text-neutral-800 dark:text-neutral-100">{benchmark.hotelCount}</p>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{benchmark.totalReviews} отзывов</p>
+        </div>
+      </div>
+
+      {benchmark.topCompetitors.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-3 uppercase tracking-wider">Ближайшие конкуренты</p>
+          <div className="space-y-2">
+            {benchmark.topCompetitors.map((comp, i) => {
+              const isAbove = comp.rating > benchmark.hotelRating;
+              return (
+                <div
+                  key={i}
+                  className="flex items-center justify-between rounded-md border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-sm"
+                >
+                  <span className="text-neutral-700 dark:text-neutral-300 truncate mr-3">{comp.name}</span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-neutral-400 text-xs">{comp.reviewCount} отз.</span>
+                    <Badge variant={isAbove ? "danger" : "success"}>
+                      {formatRating(comp.rating)}
+                    </Badge>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {benchmark.categoryBreakdown.length > 0 && (
+        <div className="mt-5">
+          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-3 uppercase tracking-wider">Распределение по рейтингу</p>
+          <div className="flex gap-2">
+            {benchmark.categoryBreakdown.map((cat) => {
+              const pct = benchmark.hotelCount > 0 ? Math.round((cat.count / benchmark.hotelCount) * 100) : 0;
+              return (
+                <div key={cat.label} className="flex-1 rounded-md border border-neutral-200 dark:border-neutral-700 p-2 text-center">
+                  <p className="text-xs text-neutral-400">{cat.label}</p>
+                  <p className="text-lg font-semibold text-neutral-700 dark:text-neutral-200">{cat.count}</p>
+                  <p className="text-[10px] text-neutral-400">{pct}%</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 
