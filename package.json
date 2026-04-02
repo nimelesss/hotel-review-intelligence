@@ -15,7 +15,8 @@
     "datasets:prepare": "npm run datasets:discover && npm run datasets:profile && npm run datasets:import",
     "db:migrate": "node scripts/db-migrate.mjs",
     "db:restore-seed": "node scripts/restore-runtime-db-from-seed.mjs",
-    "db:snapshot-seed": "node scripts/snapshot-runtime-db.mjs"
+    "db:snapshot-seed": "node scripts/snapshot-runtime-db.mjs",
+    "reviews:import": "node scripts/import-manual-reviews.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^12.8.0",
