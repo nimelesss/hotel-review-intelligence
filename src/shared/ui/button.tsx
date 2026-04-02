@@ -1,25 +1,37 @@
-import { ButtonHTMLAttributes } from "react";
+﻿import { ButtonHTMLAttributes } from "react";
 import { cn } from "@/shared/lib/cn";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Size = "sm" | "md" | "lg";
 
 const variantClass: Record<Variant, string> = {
   primary:
-    "bg-accent text-white hover:bg-[#0b5263] active:bg-[#084552] border-transparent",
-  secondary: "bg-panel text-text hover:bg-panelMuted border-border",
-  ghost: "bg-transparent text-text hover:bg-panelMuted border-transparent",
-  danger: "bg-danger text-white hover:bg-[#9e2f2f] border-transparent"
+    "border-transparent bg-accent text-white shadow-glow hover:bg-accentStrong hover:shadow-panel active:translate-y-px",
+  secondary:
+    "border-border bg-panelSolid text-text hover:border-borderStrong hover:bg-panelMuted hover:text-text active:translate-y-px",
+  ghost:
+    "border-transparent bg-transparent text-textMuted hover:bg-panelMuted hover:text-text",
+  danger:
+    "border-transparent bg-danger text-white hover:bg-[#9e3838] active:translate-y-px"
+};
+
+const sizeClass: Record<Size, string> = {
+  sm: "min-h-10 px-3.5 text-xs",
+  md: "min-h-11 px-4.5 text-sm",
+  lg: "min-h-12 px-5 text-sm"
 };
 
 export function Button({
   variant = "primary",
+  size = "md",
   className,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size }) {
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+        "inline-flex items-center justify-center gap-2 rounded-full border font-semibold tracking-[-0.01em] transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-55",
+        sizeClass[size],
         variantClass[variant],
         className
       )}
@@ -27,3 +39,4 @@ export function Button({
     />
   );
 }
+

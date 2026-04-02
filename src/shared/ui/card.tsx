@@ -1,4 +1,4 @@
-import { cn } from "@/shared/lib/cn";
+﻿import { cn } from "@/shared/lib/cn";
 
 export function Card({
   className,
@@ -10,7 +10,7 @@ export function Card({
   return (
     <section
       className={cn(
-        "anim-fade-up rounded-xl2 border border-border bg-panel p-5 shadow-panel transition-transform duration-300 hover:-translate-y-0.5",
+        "glass-panel surface-ring anim-fade-up rounded-[1.6rem] border border-border bg-panel px-5 py-5 shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:shadow-panel sm:px-6",
         className
       )}
     >
@@ -21,17 +21,25 @@ export function Card({
 
 export function CardTitle({
   title,
-  subtitle
+  subtitle,
+  kicker,
+  action
 }: {
   title: string;
   subtitle?: string;
+  kicker?: string;
+  action?: React.ReactNode;
 }) {
   return (
-    <header className="mb-4">
-      <h3 className="text-lg font-semibold leading-tight text-text">{title}</h3>
-      {subtitle ? (
-        <p className="mt-1 text-sm leading-snug text-textMuted">{subtitle}</p>
-      ) : null}
+    <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        {kicker ? (
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-textMuted">{kicker}</p>
+        ) : null}
+        <h3 className="mt-1 text-[1.05rem] font-semibold leading-tight text-text sm:text-[1.12rem]">{title}</h3>
+        {subtitle ? <p className="mt-2 max-w-[52rem] text-sm leading-6 text-textMuted">{subtitle}</p> : null}
+      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
     </header>
   );
 }

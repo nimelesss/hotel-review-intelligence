@@ -1,13 +1,13 @@
-import { cn } from "@/shared/lib/cn";
+﻿import { cn } from "@/shared/lib/cn";
 
 type Variant = "default" | "success" | "warning" | "danger" | "info";
 
 const variantClass: Record<Variant, string> = {
-  default: "bg-panelMuted text-text border-border",
-  success: "bg-panelMuted text-success border-border",
-  warning: "bg-panelMuted text-warning border-border",
-  danger: "bg-panelMuted text-danger border-border",
-  info: "bg-panelMuted text-info border-border"
+  default: "border-border bg-panelSolid text-textMuted",
+  success: "border-emerald-500/18 bg-emerald-500/10 text-success",
+  warning: "border-amber-500/18 bg-amber-500/10 text-warning",
+  danger: "border-rose-500/18 bg-rose-500/10 text-danger",
+  info: "border-sky-500/18 bg-sky-500/10 text-info"
 };
 
 export function Badge({
@@ -22,7 +22,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold",
+        "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em]",
         variantClass[variant],
         className
       )}
@@ -31,3 +31,4 @@ export function Badge({
     </span>
   );
 }
+

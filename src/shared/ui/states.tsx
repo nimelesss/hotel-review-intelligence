@@ -1,15 +1,17 @@
-import { Card } from "@/shared/ui/card";
+﻿import { Card } from "@/shared/ui/card";
 
 export function LoadingState({ label }: { label: string }) {
   return (
-    <Card className="anim-fade-in">
-      <div className="h-5 w-40 rounded bg-slate-200 anim-shimmer" />
-      <div className="mt-3 space-y-2">
-        <div className="h-4 w-full rounded bg-slate-200 anim-shimmer" />
-        <div className="h-4 w-5/6 rounded bg-slate-200 anim-shimmer" />
-        <div className="h-4 w-4/6 rounded bg-slate-200 anim-shimmer" />
+    <Card className="overflow-hidden">
+      <div className="flex flex-col gap-5">
+        <div className="h-3 w-24 rounded-full bg-panelStrong anim-shimmer" />
+        <div className="space-y-2.5">
+          <div className="h-4 w-full rounded-full bg-panelStrong anim-shimmer" />
+          <div className="h-4 w-5/6 rounded-full bg-panelStrong anim-shimmer" />
+          <div className="h-4 w-3/5 rounded-full bg-panelStrong anim-shimmer" />
+        </div>
+        <p className="text-sm leading-6 text-textMuted">{label}</p>
       </div>
-      <p className="mt-3 text-sm text-textMuted">{label}</p>
     </Card>
   );
 }
@@ -22,9 +24,12 @@ export function EmptyState({
   description: string;
 }) {
   return (
-    <Card>
-      <h3 className="text-lg font-semibold text-text">{title}</h3>
-      <p className="mt-2 text-sm text-textMuted">{description}</p>
+    <Card className="glass-panel overflow-hidden">
+      <div className="max-w-xl">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-textMuted">Пока нечего показывать</p>
+        <h3 className="mt-3 text-2xl font-semibold text-text">{title}</h3>
+        <p className="mt-3 text-sm leading-7 text-textMuted">{description}</p>
+      </div>
     </Card>
   );
 }
@@ -37,9 +42,12 @@ export function ErrorState({
   description: string;
 }) {
   return (
-    <Card className="border-red-200 bg-red-50">
-      <h3 className="text-lg font-semibold text-danger">{title}</h3>
-      <p className="mt-2 text-sm text-red-700">{description}</p>
+    <Card className="border-rose-500/18 bg-rose-500/8">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-danger">Требуется внимание</p>
+      <h3 className="mt-3 text-2xl font-semibold text-danger">{title}</h3>
+      <p className="mt-3 text-sm leading-7 text-textMuted">{description}</p>
     </Card>
   );
 }
+
+

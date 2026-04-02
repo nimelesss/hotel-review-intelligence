@@ -1,15 +1,16 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { cn } from "@/shared/lib/cn";
 
 type ThemeMode = "light" | "dark" | "system";
 
 const STORAGE_KEY = "hri-theme-mode";
 
-const OPTIONS: Array<{ mode: ThemeMode; label: string }> = [
-  { mode: "light", label: "Светлая" },
-  { mode: "dark", label: "Темная" },
-  { mode: "system", label: "Системная" }
+const OPTIONS: Array<{ mode: ThemeMode; label: string; shortLabel: string }> = [
+  { mode: "light", label: "Светлая", shortLabel: "Свет" },
+  { mode: "dark", label: "Темная", shortLabel: "Ночь" },
+  { mode: "system", label: "Системная", shortLabel: "Система" }
 ];
 
 function readMode(): ThemeMode {
@@ -40,7 +41,7 @@ function applyTheme(mode: ThemeMode) {
   root.dataset.themeMode = mode;
 }
 
-export function ThemeModeSwitcher() {
+export function ThemeModeSwitcher({ compact = false }: { compact?: boolean }) {
   const [mode, setMode] = useState<ThemeMode>("system");
 
   useEffect(() => {
@@ -76,14 +77,45 @@ export function ThemeModeSwitcher() {
     applyTheme(next);
   };
 
+  if (compact) {
+    return (
+      <div className="theme-switcher flex rounded-full border border-border bg-panelMuted p-1 shadow-soft">
+        {OPTIONS.map((option) => {
+          const active = option.mode === mode;
+          return (
+            <button
+              key={option.mode}
+              type="button"
+              className={cn(
+                "rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all duration-200",
+                active ? "bg-panelSolid text-text shadow-soft" : "text-textMuted hover:text-text"
+              )}
+              data-active={active}
+              onClick={() => setThemeMode(option.mode)}
+              aria-label={option.label}
+            >
+              {option.shortLabel}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
-    <div className="theme-switcher anim-fade-in rounded-lg border border-border bg-panelMuted p-2">
-      <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-textMuted">
-        Тема интерфейса
-      </p>
-      <div className="relative mt-2 grid grid-cols-3 rounded-md bg-panel p-1 shadow-soft">
+    <div className="theme-switcher glass-panel surface-ring rounded-[1.35rem] border border-border bg-panelMuted p-3 shadow-soft">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-textMuted">Тема интерфейса</p>
+          <p className="mt-1 text-xs leading-5 text-textSoft">Переключение без перезагрузки и с учетом системной настройки.</p>
+        </div>
+        <span className="rounded-full border border-border bg-panelSolid px-3 py-1 text-[11px] font-semibold text-textMuted">
+          {OPTIONS.find((option) => option.mode === mode)?.label}
+        </span>
+      </div>
+      <div className="relative mt-3 grid grid-cols-3 rounded-[1rem] border border-border bg-panelSolid p-1 shadow-insetSoft">
         <span
-          className="theme-switcher-thumb pointer-events-none absolute bottom-1 top-1 w-[calc(33.333%-0.25rem)] rounded-[0.45rem] bg-accentSoft"
+          className="theme-switcher-thumb pointer-events-none absolute bottom-1 top-1 w-[calc(33.333%-0.25rem)] rounded-[0.85rem] bg-accentSoft"
           style={{ transform: `translateX(calc(${activeIndex * 100}% + ${activeIndex * 0.25}rem))` }}
           aria-hidden
         />
@@ -91,7 +123,7 @@ export function ThemeModeSwitcher() {
           <button
             key={option.mode}
             type="button"
-            className="theme-switcher-button relative z-[1] rounded-[0.45rem] px-2 py-1.5 text-xs font-semibold transition-colors"
+            className="theme-switcher-button relative z-[1] rounded-[0.85rem] px-3 py-2 text-xs font-semibold transition-colors"
             data-active={option.mode === mode}
             onClick={() => setThemeMode(option.mode)}
           >
@@ -102,3 +134,4 @@ export function ThemeModeSwitcher() {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-import { TextareaHTMLAttributes } from "react";
+﻿import { TextareaHTMLAttributes } from "react";
 import { cn } from "@/shared/lib/cn";
 
 export function Textarea({
@@ -8,10 +8,11 @@ export function Textarea({
   return (
     <textarea
       className={cn(
-        "w-full rounded-lg border border-border bg-panel px-3 py-2 text-sm text-text placeholder:text-textMuted outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20",
+        "w-full rounded-[1.15rem] border border-border bg-panelSolid px-4 py-3 text-sm text-text shadow-insetSoft outline-none transition-all duration-200 placeholder:text-textSoft focus:border-accent focus:bg-panelSolid focus:ring-4 focus:ring-accentSoft",
         className
       )}
       {...props}
     />
   );
 }
+
