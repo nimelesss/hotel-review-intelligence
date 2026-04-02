@@ -1,6 +1,6 @@
 export const APP_NAME = "Hotel Review Intelligence";
 export const ANALYSIS_VERSION = "mvp-1.1.2";
-export const DEFAULT_HOTEL_ID = "hotel-1865338827"; // \u0421\u043e\u043b\u043d\u0435\u0447\u043d\u044b\u0439, \u0421\u043e\u043b\u043d\u0435\u0447\u043d\u043e\u0433\u043e\u0440\u0441\u043a (95 \u043e\u0442\u0437\u044b\u0432\u043e\u0432)
+export const DEFAULT_HOTEL_ID = "hotel-1865338827"; // Кортъярд Отель, Ростов-на-Дону
 
 export const UI_TEXT = {
   productTagline:
