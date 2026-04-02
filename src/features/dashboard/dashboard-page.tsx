@@ -501,8 +501,8 @@ export function DashboardPage() {
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             <SnapshotTile label="Текущая выборка" value={`${aggregate.totalReviews} отзывов`} detail="Сводка строится по всем доступным отзывам выбранного объекта." />
-            <SnapshotTile label="Площадки" value={String(dashboard.dataHealth.trackedSources)} detail={dashboard.dataHealth.reviewCoverageSummary} />
-            <SnapshotTile label="Последняя дата отзыва" value={dashboard.dataHealth.lastReviewDate ? formatDate(dashboard.dataHealth.lastReviewDate) : "Не указана"} detail="Чем свежее данные, тем надежнее управленческий сигнал." />
+            <SnapshotTile label="Тем в модели" value={String(aggregate.topicDistribution.length)} detail="Количество тематических направлений, по которым система формирует управленческие сигналы." />
+            <SnapshotTile label="Действий в фокусе" value={String(previewRecommendations.length)} detail="Приоритетные рекомендации, которые стоит обсудить с командой управления." />
           </div>
         </div>
       </Card>
@@ -557,34 +557,6 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardTitle kicker="Покрытие источников" title="Покрытие источников и свежесть данных" subtitle="Контроль по подключенным площадкам: объем данных, средняя оценка и текущая свежесть сигналов." />
-        <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-          <div className="rounded-[1.4rem] border border-border bg-panelMuted p-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-textMuted">Сводка покрытия</p>
-            <p className="mt-4 text-sm leading-7 text-textMuted">{dashboard.dataHealth.reviewCoverageSummary}</p>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <SnapshotTile label="Последнее обновление" value={dashboard.dataHealth.lastReviewDate ? formatDate(dashboard.dataHealth.lastReviewDate) : "Нет даты"} detail="Дата последнего зафиксированного отзыва в базе по объекту." />
-              <SnapshotTile label="Активных источников" value={String(dashboard.dataHealth.trackedSources)} detail="Количество площадок, которые реально участвуют в текущей сводке." />
-            </div>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {dashboard.sourceCoverage.length ? dashboard.sourceCoverage.map((item) => (
-              <div key={item.source} className="rounded-[1.2rem] border border-border bg-panelMuted p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-text">{item.label}</p>
-                  <Badge variant={sentimentVariant(scoreToLabel(item.averageSentiment))}>{SENTIMENT_LABELS[scoreToLabel(item.averageSentiment)]}</Badge>
-                </div>
-                <div className="mt-4 space-y-2 text-sm text-textMuted">
-                  <p>Отзывов: {item.reviews} ({formatPercent(item.share)})</p>
-                  <p>Средняя оценка: {formatRating(item.averageRating)}</p>
-                  <p>Последняя дата: {item.lastReviewDate ? formatDate(item.lastReviewDate) : "нет даты"}</p>
-                </div>
-              </div>
-            )) : <p className="text-sm leading-7 text-textMuted">Источники пока не подключены. Запустите сбор отзывов по площадкам.</p>}
-          </div>
-        </div>
-      </Card>
 
       <Card>
         <CardTitle kicker="Сегменты" title="Инсайты по сегментам" subtitle="Что ценит каждый сегмент, где возникают жалобы и как это влияет на управленческие решения." />
@@ -676,7 +648,7 @@ function SearchHero(props: {
           <div className="relative px-5 py-6 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
             <Badge variant="info">{APP_NAME}</Badge>
             <h2 className="mt-5 max-w-3xl text-3xl font-semibold leading-[1.02] text-text sm:text-[2.8rem]">Найдите отель и откройте готовую управленческую аналитику за минуты, а не после ручного чтения сотен отзывов.</h2>
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-textMuted sm:text-[15px]">Поиск по каталогу российских объектов, быстрый выбор профиля и переход к executive dashboard без перегруженного интерфейса.</p>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-textMuted sm:text-[15px]">Поиск по каталогу российских объектов, быстрый выбор профиля и мгновенный переход к управленческой аналитике без перегруженного интерфейса.</p>
             <div className="mt-6 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
               <Input id="hotel-search-input" value={searchQuery} className="min-h-14 bg-panelSolid text-base" placeholder="Например: Courtyard by Marriott Ростов-на-Дону" onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void onSearchHotels(); } }} />
               <Button onClick={() => { void onSearchHotels(); }} disabled={searching} size="lg" className={searching ? "animate-pulse" : ""}>{searching ? "Ищем отели..." : "Найти отель"}</Button>
