@@ -652,11 +652,6 @@ function SearchHero(props: {
               <Input id="hotel-search-input" value={searchQuery} className="min-h-14 bg-panelSolid text-base" placeholder="Например: Courtyard by Marriott Ростов-на-Дону" onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void onSearchHotels(); } }} />
               <Button onClick={() => { void onSearchHotels(); }} disabled={searching} size="lg" className={searching ? "animate-pulse" : ""}>{searching ? "Ищем отели..." : "Найти отель"}</Button>
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <MiniHeroPill>Только гостиничные объекты</MiniHeroPill>
-              <MiniHeroPill>Премиальная управленческая панель</MiniHeroPill>
-              <MiniHeroPill>Объяснимая аналитика</MiniHeroPill>
-            </div>
             <p className="mt-4 text-xs tracking-[0.04em] text-textMuted">Подсказки появляются автоматически при вводе 2+ символов.</p>
             {searchError ? <p className="mt-3 text-sm leading-6 text-danger">{searchError}</p> : null}
           </div>
@@ -699,10 +694,6 @@ function SearchHero(props: {
       </Card>
     </div>
   );
-}
-
-function MiniHeroPill({ children }: { children: React.ReactNode }) {
-  return <span className="inline-flex items-center rounded-full border border-border bg-panelSolid px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-textMuted">{children}</span>;
 }
 
 function HeroInsightCard({ kicker, title, description }: { kicker: string; title: string; description: string }) {
