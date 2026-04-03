@@ -37,6 +37,9 @@ interface SyncResultResponse {
   };
 }
 
+const DEFERRED_REVIEW_INTAKE_MODE = true;
+const QUEUED_RUNS_STORAGE_KEY = "hri-deferred-review-queue-runs";
+
 function presentRunSource(run: AnalysisRun): string {
   const source = (run.provider || run.sourceType) as string;
   switch (source) {
@@ -72,6 +75,7 @@ export function UploadPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [queuedRuns, setQueuedRuns] = useState<AnalysisRun[]>([]);
 
   const [newHotel, setNewHotel] = useState<CreateHotelRequest>({
     name: "",
@@ -92,6 +96,35 @@ export function UploadPage() {
   useEffect(() => {
     void loadHotels();
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    try {
+      const raw = window.localStorage.getItem(QUEUED_RUNS_STORAGE_KEY);
+      if (!raw) {
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setQueuedRuns(parsed.filter((item): item is AnalysisRun => !!item && typeof item === "object"));
+      }
+    } catch {
+      // Ignore corrupted queue snapshots.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    try {
+      window.localStorage.setItem(QUEUED_RUNS_STORAGE_KEY, JSON.stringify(queuedRuns));
+    } catch {
+      // Ignore storage write errors.
+    }
+  }, [queuedRuns]);
 
   useEffect(() => {
     if (!selectedHotelId) {
@@ -115,12 +148,21 @@ export function UploadPage() {
     return () => clearInterval(interval);
   }, [runs, selectedHotelId]);
 
+  const visibleRuns = useMemo(
+    () =>
+      [...queuedRuns.filter((run) => run.hotelId === selectedHotelId), ...runs].sort((a, b) =>
+        b.startedAt.localeCompare(a.startedAt)
+      ),
+    [queuedRuns, runs, selectedHotelId]
+  );
+
   const activeRun = useMemo(
     () =>
-      runs.find((run) => run.id === activeRunId) ||
-      runs.find((run) => run.status === "running") ||
+      visibleRuns.find((run) => run.id === activeRunId) ||
+      visibleRuns.find((run) => run.status === "running") ||
+      visibleRuns.find((run) => run.status === "pending") ||
       null,
-    [runs, activeRunId]
+    [visibleRuns, activeRunId]
   );
 
   async function loadHotels() {
@@ -198,6 +240,22 @@ export function UploadPage() {
     if (!selectedHotelId) {
       return;
     }
+    if (DEFERRED_REVIEW_INTAKE_MODE) {
+      const queuedRun = createDeferredRun({
+        hotelId: selectedHotelId,
+        sourceType,
+        preview,
+        note:
+          "Файл принят в очередь предварительной обработки. Автоматическое добавление в аналитику временно отключено."
+      });
+      setQueuedRuns((prev) => [queuedRun, ...prev.filter((run) => run.id !== queuedRun.id)]);
+      setActiveRunId(queuedRun.id);
+      setError(null);
+      setMessage(
+        "Материалы приняты в очередь. Предварительная обработка обычно занимает до 24 часов, автоматическое добавление сейчас отключено."
+      );
+      return;
+    }
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -229,6 +287,22 @@ export function UploadPage() {
     if (!selectedHotelId) {
       return;
     }
+    if (DEFERRED_REVIEW_INTAKE_MODE) {
+      const queuedRun = createDeferredRun({
+        hotelId: selectedHotelId,
+        sourceType: "platform_api",
+        provider: platformProvider,
+        note:
+          "Запрос на сбор отзывов принят в очередь. Автоматический сбор временно отключен и не изменит текущую аналитику."
+      });
+      setQueuedRuns((prev) => [queuedRun, ...prev.filter((run) => run.id !== queuedRun.id)]);
+      setActiveRunId(queuedRun.id);
+      setError(null);
+      setMessage(
+        "Запрос принят в очередь предварительной обработки. Текущая аналитика не изменится до повторного включения автосбора."
+      );
+      return;
+    }
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -256,6 +330,21 @@ export function UploadPage() {
 
   const onRealtimeAllPlatforms = async () => {
     if (!selectedHotelId) {
+      return;
+    }
+    if (DEFERRED_REVIEW_INTAKE_MODE) {
+      const queuedRun = createDeferredRun({
+        hotelId: selectedHotelId,
+        sourceType: "platform_api",
+        note:
+          "Мультисбор поставлен в очередь. Автоматический импорт временно выключен и не затронет текущую витрину."
+      });
+      setQueuedRuns((prev) => [queuedRun, ...prev.filter((run) => run.id !== queuedRun.id)]);
+      setActiveRunId(queuedRun.id);
+      setError(null);
+      setMessage(
+        "Мультисбор принят в очередь предварительной обработки. Текущие данные на сайте останутся без изменений."
+      );
       return;
     }
     setBusy(true);
@@ -300,7 +389,7 @@ export function UploadPage() {
     <div className="space-y-6">
       <PageHeader
         title="Загрузка данных"
-        subtitle="Создайте профиль отеля, выполните сбор отзывов и контролируйте статус обработки."
+        subtitle="Создайте профиль отеля, отправьте материалы в очередь и контролируйте статус обработки."
         badge="Импорт"
       />
 
@@ -371,7 +460,11 @@ export function UploadPage() {
       <Card className="anim-delay-2">
         <CardTitle
           title="2) Сбор с площадок"
-          subtitle="Запуск по одному источнику или мультисбор по всем настроенным источникам."
+          subtitle={
+            DEFERRED_REVIEW_INTAKE_MODE
+              ? "Запросы принимаются в очередь предварительной обработки без автоматического изменения аналитики."
+              : "Запуск по одному источнику или мультисбор по всем настроенным источникам."
+          }
         />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Select
@@ -418,15 +511,17 @@ export function UploadPage() {
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button onClick={onPlatformAnalyze} disabled={busy || !selectedHotelId || !datasetUrl.trim()}>
-            Запустить сбор по выбранному источнику
+            {DEFERRED_REVIEW_INTAKE_MODE ? "Поставить сбор в очередь" : "Запустить сбор по выбранному источнику"}
           </Button>
           <Button variant="secondary" onClick={onRealtimeAllPlatforms} disabled={busy || !selectedHotelId}>
-            Запустить мультисбор по всем источникам
+            {DEFERRED_REVIEW_INTAKE_MODE ? "Поставить мультисбор в очередь" : "Запустить мультисбор по всем источникам"}
           </Button>
           <Badge variant="info">пайплайн: сбор → нормализация → дедупликация → анализ</Badge>
         </div>
         <p className="mt-2 text-xs text-textMuted">
-          Для одиночного запуска укажите источник и ссылку на dataset. Для мультисбора используются источники из серверной конфигурации.
+          {DEFERRED_REVIEW_INTAKE_MODE
+            ? "Пока что запросы фиксируются в интерфейсе как ожидающие обработки и не меняют текущую витрину."
+            : "Для одиночного запуска укажите источник и ссылку на dataset. Для мультисбора используются источники из серверной конфигурации."}
         </p>
       </Card>
 
@@ -435,7 +530,11 @@ export function UploadPage() {
       <Card>
         <CardTitle
           title="3) Ручной импорт CSV/JSON"
-          subtitle="Альтернативный путь для выгрузок из PMS/CRM/OTA."
+          subtitle={
+            DEFERRED_REVIEW_INTAKE_MODE
+              ? "Файлы принимаются в очередь предварительной обработки без прямого импорта в текущую аналитику."
+              : "Альтернативный путь для выгрузок из PMS/CRM/OTA."
+          }
         />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Select
@@ -470,7 +569,7 @@ export function UploadPage() {
               Предпросмотр
             </Button>
             <Button variant="secondary" onClick={onImport} disabled={busy}>
-              Импорт и анализ
+              {DEFERRED_REVIEW_INTAKE_MODE ? "Отправить в очередь" : "Импорт и анализ"}
             </Button>
           </div>
         </div>
@@ -520,10 +619,14 @@ export function UploadPage() {
 
       <Card>
         <CardTitle title="История запусков" subtitle="Все выполненные и активные задачи обработки." />
-        {!runs.length ? (
+        {!visibleRuns.length ? (
           <EmptyState
             title="Запусков пока нет"
-            description="Запустите сбор по площадкам или ручной импорт."
+            description={
+              DEFERRED_REVIEW_INTAKE_MODE
+                ? "Добавьте материалы в очередь, чтобы увидеть статус приема и подготовки."
+                : "Запустите сбор по площадкам или ручной импорт."
+            }
           />
         ) : (
           <div className="overflow-x-auto">
@@ -541,7 +644,7 @@ export function UploadPage() {
                 </tr>
               </thead>
               <tbody>
-                {runs.map((run) => (
+                {visibleRuns.map((run) => (
                   <tr
                     key={run.id}
                     className="cursor-pointer border-b border-border hover:bg-panelMuted"
@@ -588,7 +691,7 @@ function translateRunStatus(status: AnalysisRun["status"]): string {
   if (status === "running") {
     return "В работе";
   }
-  return "Ожидание";
+  return "В очереди";
 }
 
 function translateRunStage(stage?: string): string {
@@ -605,6 +708,32 @@ function translateRunStage(stage?: string): string {
     failed: "Ошибка"
   };
   return map[stage] || stage;
+}
+
+function createDeferredRun(input: {
+  hotelId: string;
+  sourceType: AnalysisRunSourceType;
+  preview?: IngestionPreviewResult | null;
+  provider?: PlatformProvider;
+  note: string;
+}): AnalysisRun {
+  const now = new Date().toISOString();
+  const acceptedRows = input.preview?.validRows ?? input.preview?.totalRows ?? 0;
+
+  return {
+    id: `queued-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    hotelId: input.hotelId,
+    sourceType: input.sourceType,
+    provider: input.provider,
+    totalReviewsProcessed: acceptedRows,
+    fetchedReviews: acceptedRows || undefined,
+    status: "pending",
+    startedAt: now,
+    analysisVersion: "queue-placeholder",
+    progressPct: 12,
+    stage: "fetching_reviews",
+    notes: input.note
+  };
 }
 
 
