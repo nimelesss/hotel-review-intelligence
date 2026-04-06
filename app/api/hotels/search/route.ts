@@ -256,6 +256,7 @@ function buildQueryVariants(query: string): string[] {
 function replaceBrandAliases(query: string): string {
   return query
     .replace(/\u043a\u043e\u0440\u0442[\u044a\u044c]?\u044f\u0440\u0434/giu, "courtyard")
+    .replace(/\u043c\u0435\u0440\u043a\u044e\u0440/giu, "mercure")
     .replace(/\u043c\u0430\u0440\u0440\u0438?\u043e\u0442\u0442/giu, "marriott")
     .replace(/\u0445\u0438\u043b\u0442\u043e\u043d/giu, "hilton")
     .replace(/\u0445\u0430\u044f\u0442\u0442/giu, "hyatt")
@@ -265,6 +266,7 @@ function replaceBrandAliases(query: string): string {
 function replaceLatinBrandAliases(query: string): string {
   return query
     .replace(/\bcourtyard\b/giu, "\u043a\u043e\u0440\u0442\u044a\u044f\u0440\u0434")
+    .replace(/\bmercure\b/giu, "\u043c\u0435\u0440\u043a\u044e\u0440")
     .replace(/\bmarriott\b/giu, "\u043c\u0430\u0440\u0440\u0438\u043e\u0442\u0442")
     .replace(/\bhilton\b/giu, "\u0445\u0438\u043b\u0442\u043e\u043d")
     .replace(/\bhyatt\b/giu, "\u0445\u0430\u044f\u0442\u0442")

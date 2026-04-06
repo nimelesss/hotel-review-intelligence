@@ -264,12 +264,11 @@ export function DashboardPage() {
     setSearchError(null);
     setSyncMessage(null);
     try {
-      const existing = findBestExistingHotel(hotels, candidate);
-
-      if (existing) {
-        const nextQuery = `${existing.name}, ${existing.city}`;
-        setSelectedHotelId(existing.id);
-        setSyncMessage(`Открыт существующий профиль: ${existing.name}.`);
+      if (candidate.externalId?.startsWith("hotel-")) {
+        const repositoryHotelId = candidate.externalId;
+        const nextQuery = `${candidate.name}, ${candidate.city}`;
+        setSelectedHotelId(repositoryHotelId);
+        setSyncMessage(`Открыт существующий профиль: ${candidate.name}.`);
         setSearchResults([]);
         setShowSearchResults(false);
         setSearchLockQuery(nextQuery);
@@ -278,11 +277,12 @@ export function DashboardPage() {
         return;
       }
 
-      if (candidate.externalId?.startsWith("hotel-")) {
-        const repositoryHotelId = candidate.externalId;
-        const nextQuery = `${candidate.name}, ${candidate.city}`;
-        setSelectedHotelId(repositoryHotelId);
-        setSyncMessage(`Открыт существующий профиль: ${candidate.name}.`);
+      const existing = findBestExistingHotel(hotels, candidate);
+
+      if (existing) {
+        const nextQuery = `${existing.name}, ${existing.city}`;
+        setSelectedHotelId(existing.id);
+        setSyncMessage(`Открыт существующий профиль: ${existing.name}.`);
         setSearchResults([]);
         setShowSearchResults(false);
         setSearchLockQuery(nextQuery);
@@ -817,6 +817,7 @@ function scoreExistingHotel(hotel: Hotel, candidate: HotelSearchResult): number 
   const candidateExternal = normalizeKey(candidate.externalId || "");
   const hotelExternal = normalizeKey(hotel.externalId || "");
   let hasAnchorMatch = false;
+  const cityMatches = normalizeKey(hotel.city) === normalizeKey(candidate.city);
 
   if (candidateExternal) {
     if (normalizeKey(hotel.id) === candidateExternal) {
@@ -829,13 +830,21 @@ function scoreExistingHotel(hotel: Hotel, candidate: HotelSearchResult): number 
     }
   }
 
-  const hotelKeys = buildHotelMatchKeys(hotel.name, hotel.city);
-  const candidateKeys = buildHotelMatchKeys(candidate.name, candidate.city);
-  const sharedKeys = [...candidateKeys].filter((key) => hotelKeys.has(key));
-  if (sharedKeys.length > 0) {
+  const hotelStrictKeys = buildHotelStrictMatchKeys(hotel.name, hotel.city);
+  const candidateStrictKeys = buildHotelStrictMatchKeys(candidate.name, candidate.city);
+  const strictSharedKeys = [...candidateStrictKeys].filter((key) => hotelStrictKeys.has(key));
+  if (strictSharedKeys.length > 0) {
     hasAnchorMatch = true;
+    score += strictSharedKeys.length * 160;
   }
-  score += sharedKeys.length * 140;
+
+  const hotelNameKeys = buildHotelNameMatchKeys(hotel.name);
+  const candidateNameKeys = buildHotelNameMatchKeys(candidate.name);
+  const sharedNameKeys = [...candidateNameKeys].filter((key) => hotelNameKeys.has(key));
+  if (sharedNameKeys.length > 0 && cityMatches) {
+    hasAnchorMatch = true;
+    score += sharedNameKeys.length * 110;
+  }
 
   if (normalizeKey(hotel.address) === normalizeKey(candidate.address || "")) {
     score += 80;
@@ -846,7 +855,7 @@ function scoreExistingHotel(hotel: Hotel, candidate: HotelSearchResult): number 
     return 0;
   }
 
-  if (normalizeKey(hotel.city) === normalizeKey(candidate.city)) {
+  if (cityMatches) {
     score += 50;
   }
 
@@ -858,26 +867,51 @@ function scoreExistingHotel(hotel: Hotel, candidate: HotelSearchResult): number 
   return score;
 }
 
-function buildHotelMatchKeys(name: string, city: string): Set<string> {
-  const baseName = normalizeKey(name);
+function buildHotelStrictMatchKeys(name: string, city: string): Set<string> {
+  const normalizedCity = normalizeKey(city);
   const baseFull = normalizeKey(`${name} ${city}`);
-  const strippedName = normalizeKey(stripAccommodationWords(name));
   const strippedFull = normalizeKey(stripAccommodationWords(`${name} ${city}`));
-  const aliasName = replaceBrandAliases(baseName);
   const aliasFull = replaceBrandAliases(baseFull);
-  const aliasStrippedName = replaceBrandAliases(strippedName);
   const aliasStrippedFull = replaceBrandAliases(strippedFull);
-  const translitName = transliterateCyrillicToLatin(aliasName);
   const translitFull = transliterateCyrillicToLatin(aliasFull);
-  const translitStrippedName = transliterateCyrillicToLatin(aliasStrippedName);
   const translitStrippedFull = transliterateCyrillicToLatin(aliasStrippedFull);
 
-  return new Set([baseName, baseFull, strippedName, strippedFull, aliasName, aliasFull, aliasStrippedName, aliasStrippedFull, translitName, translitFull, translitStrippedName, translitStrippedFull].filter((value) => value.length >= 2));
+  return new Set(
+    [
+      baseFull,
+      strippedFull,
+      aliasFull,
+      aliasStrippedFull,
+      translitFull,
+      translitStrippedFull
+    ].filter((value) => value.length >= Math.max(4, normalizedCity.length + 2))
+  );
+}
+
+function buildHotelNameMatchKeys(name: string): Set<string> {
+  const baseName = normalizeKey(name);
+  const strippedName = normalizeKey(stripAccommodationWords(name));
+  const aliasName = replaceBrandAliases(baseName);
+  const aliasStrippedName = replaceBrandAliases(strippedName);
+  const translitName = transliterateCyrillicToLatin(aliasName);
+  const translitStrippedName = transliterateCyrillicToLatin(aliasStrippedName);
+
+  return new Set(
+    [
+      baseName,
+      strippedName,
+      aliasName,
+      aliasStrippedName,
+      translitName,
+      translitStrippedName
+    ].filter((value) => value.length >= 3)
+  );
 }
 
 function replaceBrandAliases(value: string): string {
   return value
     .replace(/\u043a\u043e\u0440\u0442[\u044a\u044c]?\u044f\u0440\u0434/giu, "courtyard")
+    .replace(/\u043c\u0435\u0440\u043a\u044e\u0440/giu, "mercure")
     .replace(/\u043c\u0430\u0440\u0440\u0438?\u043e\u0442\u0442/giu, "marriott")
     .replace(/\u043c\u0430\u0440\u0438\u043d\u0441/giu, "marins")
     .replace(/\u0445\u0438\u043b\u0442\u043e\u043d/giu, "hilton")
@@ -891,8 +925,6 @@ function transliterateCyrillicToLatin(value: string): string {
 
   return [...value].map((char) => map[char.toLocaleLowerCase("ru-RU")] ?? char).join("");
 }
-
-
 
 
 
